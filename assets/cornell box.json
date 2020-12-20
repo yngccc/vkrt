@@ -1,0 +1,19 @@
+{
+  "camera": {
+    "position": [ 0.418922, 1.22333, 4.26933 ],
+    "view": [ -0.986717, 0.0564954, -20.6702 ]
+  },
+  "models": [
+    {
+      "name": "cornell box",
+      "path": "cornell box/cornell box.gltf"
+    }
+  ],
+  "lights": [
+    {
+      "type": "point",
+      "position": [ 0, 1.25199, 2.33191 ],
+      "color": [ 1, 1, 1 ]
+    }
+  ]
+}

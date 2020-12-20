@@ -1,0 +1,19 @@
+{
+  "camera": {
+    "position": [ 6.63976, 2.49817, -0.114749 ],
+    "view": [ 4.65024, 2.31191, -0.216829 ]
+  },
+  "models": [
+    {
+      "name": "sponza",
+      "path": "sponza/sponza.gltf"
+    }
+  ],
+  "lights": [
+    {
+      "type": "point",
+      "position": [ 0.605829, 13.0052, -0.371928 ],
+      "color": [ 1, 1, 1 ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+#version 460
+
+#extension GL_EXT_ray_tracing : require
+
+layout(set = 0, binding = 0, rgba32f) uniform image2D image;
+layout(set = 0, binding = 1) uniform accelerationStructureEXT tlas;
+
+void main() {
+	vec3 c = vec3(gl_LaunchIDEXT) / vec3(gl_LaunchSizeEXT);
+	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(c, 1));
+}
