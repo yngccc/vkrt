@@ -1,12 +1,13 @@
+@echo off
+
+set curDir=%cd%
+set flags=--target-env vulkan1.2 -g
+
 pushd %~dp0
-
-set flags=--target-env=vulkan1.2 -g
-
-%VK_SDK_PATH%\bin\glslc.exe %flags% swapChain.vert -o %1\swapChain.vert.spv
-%VK_SDK_PATH%\bin\glslc.exe %flags% swapChain.frag -o %1\swapChain.frag.spv
-
-%VK_SDK_PATH%\bin\glslc.exe %flags% imgui.vert -o %1\imgui.vert.spv
-%VK_SDK_PATH%\bin\glslc.exe %flags% imgui.frag -o %1\imgui.frag.spv
-
-%VK_SDK_PATH%\bin\glslc.exe %flags% rayTrace.rgen -o %1\rayTrace.rgen.spv
-%VK_SDK_PATH%\bin\glslc.exe %flags% rayTrace.rmiss -o %1\rayTrace.rmiss.spv
+for %%A in (*.vert) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %curDir%\%%A.spv
+for %%A in (*.frag) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %curDir%\%%A.spv
+for %%A in (*.rgen) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %curDir%\%%A.spv
+for %%A in (*.rmiss) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %curDir%\%%A.spv
+for %%A in (*.rchit) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %curDir%\%%A.spv
+for %%A in (*.rahit) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %curDir%\%%A.spv
+popd

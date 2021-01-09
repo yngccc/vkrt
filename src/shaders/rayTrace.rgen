@@ -5,7 +5,30 @@
 layout(set = 0, binding = 0, rgba32f) uniform image2D image;
 layout(set = 0, binding = 1) uniform accelerationStructureEXT tlas;
 
+layout(push_constant) uniform pushConstant {
+	mat4 screenToWorldMat;
+	vec4 eyePos;
+};
+
+vec3 getPixelWorldPos(in uvec2 resolution, in uvec2 pixelIndex) {
+	vec2 pixelCenterIndex = vec2(pixelIndex) + vec2(0.5, 0.5);
+	vec2 screenPos = (pixelCenterIndex / vec2(resolution)) * 2.0 - 1.0;
+	vec4 world = screenToWorldMat * vec4(screenPos, 0.0, 1.0);
+	return world.xyz / world.w;
+}
+
+layout(location = 0) rayPayloadEXT vec3 hit;
+
 void main() {
-	vec3 c = vec3(gl_LaunchIDEXT) / vec3(gl_LaunchSizeEXT);
-	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(c, 1));
+	uvec2 resolution = gl_LaunchSizeEXT.xy;
+	uvec2 pixelIndex = gl_LaunchIDEXT.xy;
+
+	vec3 pixelWorldPos = getPixelWorldPos(resolution, pixelIndex);
+
+	vec3 rayDir = normalize(pixelWorldPos - eyePos.xyz);
+
+	traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, eyePos.xyz, 0, rayDir, 1000, 0);
+	
+	vec3 color = hit;
+	imageStore(image, ivec2(pixelIndex), vec4(color, 1));
 }

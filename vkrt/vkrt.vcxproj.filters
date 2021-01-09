@@ -55,5 +55,11 @@
     <None Include="..\src\shaders\rayTrace.rmiss">
       <Filter>Source Files\shaders</Filter>
     </None>
+    <None Include="..\src\shaders\rayTrace.rchit">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="..\src\shaders\common.glsl">
+      <Filter>Source Files\shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

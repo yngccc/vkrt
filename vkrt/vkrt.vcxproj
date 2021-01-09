@@ -45,14 +45,14 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SDL_SDK_PATH)\include;$(VK_SDK_PATH)\include;$(GLM_PATH);$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(IncludePath)</IncludePath>
+    <IncludePath>$(SDL_SDK_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(IncludePath)</IncludePath>
     <LibraryPath>$(SDL_SDK_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SDL_SDK_PATH)\include;$(VK_SDK_PATH)\include;$(GLM_PATH);$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(IncludePath)</IncludePath>
+    <IncludePath>$(SDL_SDK_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(IncludePath)</IncludePath>
     <LibraryPath>$(SDL_SDK_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
@@ -71,14 +71,14 @@
       <AdditionalDependencies>SDL2.lib;SDL2main.lib;vulkan-1.lib;Shcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
-call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
+      <Command>
+      </Command>
       <Message>
       </Message>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>
-      </Command>
+      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
+</Command>
     </PreBuildEvent>
     <CustomBuildStep>
       <Command>
@@ -103,14 +103,13 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <AdditionalDependencies>SDL2.lib;SDL2main.lib;vulkan-1.lib;Shcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
-call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
+      <Command>
+      </Command>
       <Message>
       </Message>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>
-      </Command>
+      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"</Command>
     </PreBuildEvent>
     <CustomBuildStep>
       <Command>
@@ -126,9 +125,11 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
     <ClInclude Include="..\src\vk.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\src\shaders\common.glsl" />
     <None Include="..\src\shaders\compile.bat" />
     <None Include="..\src\shaders\imgui.frag" />
     <None Include="..\src\shaders\imgui.vert" />
+    <None Include="..\src\shaders\rayTrace.rchit" />
     <None Include="..\src\shaders\rayTrace.rgen" />
     <None Include="..\src\shaders\rayTrace.rmiss" />
     <None Include="..\src\shaders\swapChain.frag" />

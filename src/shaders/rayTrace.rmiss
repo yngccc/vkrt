@@ -2,7 +2,8 @@
 
 #extension GL_EXT_ray_tracing : require
 
-layout(set = 0, binding = 0, rgba32f) uniform image2D image;
+layout(location = 0) rayPayloadInEXT vec3 hit;
 
 void main() {
+	hit = vec3(0);
 }

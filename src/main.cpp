@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
 	imguiInit();
 	ImGuiIO& imguiIO = ImGui::GetIO();
 	Vulkan* vk = Vulkan::create(window);
-	Scene* scene = Scene::create("../../assets/cornell box.json", vk);
+	Scene* scene = Scene::create("../../assets/sponza.json", vk);
 
 	SDL_Event event;
 	bool running = true;
@@ -91,7 +91,6 @@ int main(int argc, char** argv) {
 
 		int windowWidth, windowHeight;
 		SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-
 		{
 			ImGui::GetIO().DisplaySize = { float(windowWidth), float(windowHeight) };
 			ImGui::NewFrame();
@@ -129,7 +128,7 @@ int main(int argc, char** argv) {
 				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
 				.srcQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
 				.dstQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
-				.image = vk->colorBuffer,
+				.image = vk->colorBufferTexture.first,
 				.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
 			};
 			vkCmdPipelineBarrier(
@@ -146,21 +145,110 @@ int main(int argc, char** argv) {
 			};
 			VkDescriptorSet descriptorSet;
 			vkCheck(vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet));
-			VkDescriptorImageInfo descriptorImageInfo = { 
+			VkDescriptorImageInfo colorBufferImageInfo = { 
 				.sampler = nullptr,
-				.imageView = vk->colorBufferView,
+				.imageView = vk->colorBufferTexture.second,
 				.imageLayout = VK_IMAGE_LAYOUT_GENERAL
 			};
-			VkWriteDescriptorSet writeDescriptorSet = {
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = descriptorSet,
-				.dstBinding = 0,
-				.descriptorCount = 1,
-				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-				.pImageInfo = &descriptorImageInfo
+			VkWriteDescriptorSetAccelerationStructureKHR accelerationStructInfo = {
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+				.accelerationStructureCount = 1,
+				.pAccelerationStructures = &scene->tlas
 			};
-			vkUpdateDescriptorSets(vk->device, 1, &writeDescriptorSet, 0, nullptr);
+			VkDescriptorBufferInfo verticesBufferInfos = {
+					.buffer = scene->verticesBuffer,
+					.range = VK_WHOLE_SIZE
+			};
+			VkDescriptorBufferInfo indicesBufferInfos = {
+					.buffer = scene->indicesBuffer,
+					.range = VK_WHOLE_SIZE
+			};
+			VkDescriptorBufferInfo geometriesBufferInfos = {
+					.buffer = scene->geometriesBuffer,
+					.range = VK_WHOLE_SIZE
+			};
+			VkDescriptorBufferInfo materialsBufferInfos = {
+					.buffer = scene->materialsBuffer,
+					.range = VK_WHOLE_SIZE
+			};
+			VkDescriptorBufferInfo instancesBufferInfos = {
+					.buffer = scene->instancesBuffer,
+					.range = VK_WHOLE_SIZE
+			};
+			std::vector<VkDescriptorImageInfo> textureImageInfos(vk->rayTracingDescriptorSet0TextureCount);
+			for (auto [i, info] : enumerate(textureImageInfos)) {
+				if (i < scene->textures.size()) {
+					info = {
+						.sampler = vk->colorBufferTextureSampler,
+						.imageView = scene->textures[i].second,
+						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+					};
+				}
+				else {
+					info = {
+						.sampler = vk->blankTextureSampler,
+						.imageView = vk->blankTexture.second,
+						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+					};
+				}
+			}
+			VkWriteDescriptorSet descriptorSetWrites[] = {
+				{
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+					.pImageInfo = &colorBufferImageInfo
+				},
+				{
+					.pNext = &accelerationStructInfo,
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+				},
+				{
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = &verticesBufferInfos
+				},
+				{
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = &indicesBufferInfos
+				},
+				{
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = &geometriesBufferInfos
+				},
+				{
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = &materialsBufferInfos
+				},
+				{
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = &instancesBufferInfos
+				},
+				{
+					.descriptorCount = (uint32)textureImageInfos.size(),
+					.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+					.pImageInfo = textureImageInfos.data()
+				}
+			};
+			for (auto [i, setWrite] : enumerate(descriptorSetWrites)) {
+				setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				setWrite.dstSet = descriptorSet;
+				setWrite.dstBinding = (uint32)i;
+			}
+			vkUpdateDescriptorSets(vk->device, countof(descriptorSetWrites), descriptorSetWrites, 0, nullptr);
 			vkCmdBindDescriptorSets(vkFrame.cmdBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
+			struct { 
+				XMMATRIX screenToWorldMat;
+				XMVECTOR eyePos;
+			} pushConsts = {
+				XMMatrixInverse(nullptr, scene->camera.viewProjMat), scene->camera.position
+			};
+			vkCmdPushConstants(vkFrame.cmdBuffer, vk->rayTracingPipelineLayout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(pushConsts), &pushConsts);
 
 			vkCmdTraceRays(
 				vkFrame.cmdBuffer, 
@@ -168,7 +256,7 @@ int main(int argc, char** argv) {
 				&vk->rayTracingSBTBufferMissDeviceAddress, 
 				&vk->rayTracingSBTBufferHitGroupDeviceAddress, 
 				&vk->rayTracingSBTBufferHitGroupDeviceAddress, 
-				uint32(windowWidth), uint32(windowHeight), 1
+				(uint32)windowWidth, (uint32)windowHeight, 1
 			);
 
 			colorBufferImageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -200,8 +288,8 @@ int main(int argc, char** argv) {
 			VkDescriptorSet descriptorSet;
 			vkCheck(vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet));
 			VkDescriptorImageInfo descriptorImageInfo = { 
-				.sampler = vk->colorBufferSampler, 
-				.imageView = vk->colorBufferView, 
+				.sampler = vk->colorBufferTextureSampler, 
+				.imageView = vk->colorBufferTexture.second,
 				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			};
 			VkWriteDescriptorSet writeDescriptorSet = {
@@ -233,7 +321,7 @@ int main(int argc, char** argv) {
 			vkCheck(vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet));
 			VkDescriptorImageInfo descriptorImageInfo = {
 				.sampler = vk->imguiTextureSampler,
-				.imageView = vk->imguiTextureView,
+				.imageView = vk->imguiTexture.second,
 				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			};
 			VkWriteDescriptorSet writeDescriptorSet = {
@@ -267,9 +355,9 @@ int main(int argc, char** argv) {
 					if (clipRect.x < windowWidth && clipRect.y < windowHeight && clipRect.z >= 0.0f && clipRect.w >= 0.0f) {
 						if (clipRect.x < 0) clipRect.x = 0;
 						if (clipRect.y < 0) clipRect.y = 0;
-						VkRect2D scissor = { { int32(clipRect.x), int32(clipRect.y) }, { uint32(clipRect.z - clipRect.x), uint32(clipRect.w - clipRect.y) } };
+						VkRect2D scissor = { { (int32)clipRect.x, (int32)clipRect.y }, { (uint32)(clipRect.z - clipRect.x), (uint32)(clipRect.w - clipRect.y) } };
 						vkCmdSetScissor(vkFrame.cmdBuffer, 0, 1, &scissor);
-						vkCmdDrawIndexed(vkFrame.cmdBuffer, drawCmd.ElemCount, 1, uint32(idxIndex), int32(vertIndex), 0);
+						vkCmdDrawIndexed(vkFrame.cmdBuffer, drawCmd.ElemCount, 1, (uint32)idxIndex, (int32)vertIndex, 0);
 					}
 					idxIndex += drawCmd.ElemCount;
 				}
