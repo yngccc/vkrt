@@ -1,9 +1,7 @@
 #version 460
 
-#extension GL_EXT_ray_tracing : require
-
-layout(set = 0, binding = 0, rgba32f) uniform image2D image;
-layout(set = 0, binding = 1) uniform accelerationStructureEXT tlas;
+#extension GL_GOOGLE_include_directive : require
+#include "rayTraceCommon.glsl"
 
 layout(push_constant) uniform pushConstant {
 	mat4 screenToWorldMat;
@@ -17,7 +15,7 @@ vec3 getPixelWorldPos(in uvec2 resolution, in uvec2 pixelIndex) {
 	return world.xyz / world.w;
 }
 
-layout(location = 0) rayPayloadEXT vec3 hit;
+layout(location = 0) rayPayloadEXT PrimaryRayPayload primaryRayPayload;
 
 void main() {
 	uvec2 resolution = gl_LaunchSizeEXT.xy;
@@ -29,6 +27,6 @@ void main() {
 
 	traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, eyePos.xyz, 0, rayDir, 1000, 0);
 	
-	vec3 color = hit;
+	vec3 color = primaryRayPayload.color;
 	imageStore(image, ivec2(pixelIndex), vec4(color, 1));
 }

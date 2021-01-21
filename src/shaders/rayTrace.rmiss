@@ -1,9 +1,10 @@
 #version 460
 
-#extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : require
+#include "rayTraceCommon.glsl"
 
-layout(location = 0) rayPayloadInEXT vec3 hit;
+layout(location = 0) rayPayloadInEXT PrimaryRayPayload primaryRayPayload;
 
 void main() {
-	hit = vec3(0);
+	primaryRayPayload.color = vec3(0);
 }

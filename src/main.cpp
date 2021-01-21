@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
 	imguiInit();
 	ImGuiIO& imguiIO = ImGui::GetIO();
 	Vulkan* vk = Vulkan::create(window);
-	Scene* scene = Scene::create("../../assets/sponza.json", vk);
+	Scene* scene = Scene::create("../../assets/cornell box.json", vk);
 
 	SDL_Event event;
 	bool running = true;

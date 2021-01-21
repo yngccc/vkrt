@@ -77,12 +77,13 @@
       </Message>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
-</Command>
-    </PreBuildEvent>
-    <CustomBuildStep>
       <Command>
       </Command>
+    </PreBuildEvent>
+    <CustomBuildStep>
+      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
+call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
+      <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -109,11 +110,12 @@
       </Message>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"</Command>
-    </PreBuildEvent>
-    <CustomBuildStep>
       <Command>
       </Command>
+    </PreBuildEvent>
+    <CustomBuildStep>
+      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"</Command>
+      <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -129,9 +131,13 @@
     <None Include="..\src\shaders\compile.bat" />
     <None Include="..\src\shaders\imgui.frag" />
     <None Include="..\src\shaders\imgui.vert" />
+    <None Include="..\src\shaders\rayTrace.rahit" />
     <None Include="..\src\shaders\rayTrace.rchit" />
-    <None Include="..\src\shaders\rayTrace.rgen" />
+    <None Include="..\src\shaders\rayTrace.rgen">
+      <FileType>Document</FileType>
+    </None>
     <None Include="..\src\shaders\rayTrace.rmiss" />
+    <None Include="..\src\shaders\rayTraceCommon.glsl" />
     <None Include="..\src\shaders\swapChain.frag" />
     <None Include="..\src\shaders\swapChain.vert" />
   </ItemGroup>
