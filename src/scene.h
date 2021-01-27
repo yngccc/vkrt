@@ -123,6 +123,7 @@ struct Scene {
 		scene->buildVkResources(vk);
 		return scene;
 	}
+
 	void loadJson() {
 		std::ifstream file(filePath);
 		json j;
@@ -163,6 +164,7 @@ struct Scene {
 			}
 		}
 	}
+
 	void loadModelsData() {
 		for (auto& model : models) {
 			std::filesystem::path modelFilePath = filePath.parent_path() / model.filePath;
@@ -207,6 +209,7 @@ struct Scene {
 			}
 		}
 	}
+
 	void buildVkResources(Vulkan* vk) {
 		std::vector<VkAccelerationStructureBuildGeometryInfoKHR> blasInfos;
 		std::vector<VkAccelerationStructureBuildSizesInfoKHR> blasSizes;
@@ -378,7 +381,7 @@ struct Scene {
 		std::vector<InstanceData> instancesBufferData;
 		uint64 instancesBufferSize = 0;
 		{
-			for (uint64 blasOffset = 0; auto& model : models) {
+			for (uint64 blasOffset = 0; auto & model : models) {
 				std::stack<cgltf_node*> nodes;
 				std::stack<XMMATRIX> transforms;
 				for (auto& node : makeRange(model.gltfData->scene->nodes, model.gltfData->scene->nodes_count)) {
@@ -500,8 +503,8 @@ struct Scene {
 			tlasInfo.scratchData.deviceAddress = scratchBufferDeviceAddress;
 		}
 		{
-			uint64 stageBufferSize = 
-				verticesBufferSize + indicesBufferSize + geometriesBufferSize + 
+			uint64 stageBufferSize =
+				verticesBufferSize + indicesBufferSize + geometriesBufferSize +
 				materialsBufferSize + instancesBufferSize + tlasBuildInstancesBufferSize;
 			for (auto& model : models) {
 				for (auto& image : model.images) {
@@ -581,8 +584,8 @@ struct Scene {
 				.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 				.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 			};
-			vkCheck(vkResetCommandBuffer(vk->computeCommandBuffer, 0));
-			vkCheck(vkBeginCommandBuffer(vk->computeCommandBuffer, &cmdBufferBeginInfo));
+			vkCheck(vkResetCommandBuffer(vk->computeCmdBuf, 0));
+			vkCheck(vkBeginCommandBuffer(vk->computeCmdBuf, &cmdBufferBeginInfo));
 
 			std::pair<VkBuffer, uint64> bufferInfos[] = {
 				{ verticesBuffer, verticesBufferSize },
@@ -598,7 +601,7 @@ struct Scene {
 					.srcOffset = stagingBufferOffset,
 					.size = bufferInfo.second
 				};
-				vkCmdCopyBuffer(vk->computeCommandBuffer, vk->stagingBuffer, bufferInfo.first, 1, &bufferCopy);
+				vkCmdCopyBuffer(vk->computeCmdBuf, vk->stagingBuffer, bufferInfo.first, 1, &bufferCopy);
 				stagingBufferOffset += bufferInfo.second;
 			}
 
@@ -622,7 +625,7 @@ struct Scene {
 					}
 				};
 			}
-			vkCmdPipelineBarrier(vk->computeCommandBuffer,
+			vkCmdPipelineBarrier(vk->computeCmdBuf,
 				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
 				0, nullptr, 0, nullptr, (uint32)imageBarriers.size(), imageBarriers.data()
 			);
@@ -642,7 +645,7 @@ struct Scene {
 						.imageOffset = { 0, 0, 0 },
 						.imageExtent = { image.width, image.height, 1 }
 					};
-					vkCmdCopyBufferToImage(vk->computeCommandBuffer, 
+					vkCmdCopyBufferToImage(vk->computeCmdBuf,
 						vk->stagingBuffer, textures[textureIndex].first, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
 					stagingBufferOffset = align(stagingBufferOffset + image.size, 16);
 					textureIndex += 1;
@@ -660,7 +663,7 @@ struct Scene {
 				barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 				barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			}
-			vkCmdPipelineBarrier(vk->computeCommandBuffer,
+			vkCmdPipelineBarrier(vk->computeCmdBuf,
 				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0,
 				1, &memoryBarrier, 0, nullptr, (uint32)imageBarriers.size(), imageBarriers.data()
 			);
@@ -669,7 +672,7 @@ struct Scene {
 			for (auto [i, range] : enumerate(blasRangesPtr)) {
 				range = blasRanges[i].data();
 			}
-			vkCmdBuildAccelerationStructures(vk->computeCommandBuffer, (uint32)blasInfos.size(), blasInfos.data(), blasRangesPtr.data());
+			vkCmdBuildAccelerationStructures(vk->computeCmdBuf, (uint32)blasInfos.size(), blasInfos.data(), blasRangesPtr.data());
 
 			memoryBarrier = {
 				.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
@@ -677,23 +680,144 @@ struct Scene {
 				.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
 			};
 			vkCmdPipelineBarrier(
-				vk->computeCommandBuffer,
+				vk->computeCmdBuf,
 				VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0,
 				1, &memoryBarrier, 0, nullptr, 0, nullptr
 			);
 			VkAccelerationStructureBuildRangeInfoKHR* tlasRangePtr = &tlasRange;
-			vkCmdBuildAccelerationStructures(vk->computeCommandBuffer, 1, &tlasInfo, &tlasRangePtr);
+			vkCmdBuildAccelerationStructures(vk->computeCmdBuf, 1, &tlasInfo, &tlasRangePtr);
 
-			vkCheck(vkEndCommandBuffer(vk->computeCommandBuffer));
+			vkCheck(vkEndCommandBuffer(vk->computeCmdBuf));
 
 			VkSubmitInfo queueSubmitInfo = {
 				.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 				.commandBufferCount = 1,
-				.pCommandBuffers = &vk->computeCommandBuffer
+				.pCommandBuffers = &vk->computeCmdBuf
 			};
 			vkCheck(vkQueueSubmit(vk->computeQueue, 1, &queueSubmitInfo, nullptr));
 			vkQueueWaitIdle(vk->computeQueue);
 		}
 	}
-};
 
+	void drawCommands(Vulkan* vk, uint windowWidth, uint windowHeight) {
+		auto& vkFrame = vk->frames[vk->frameIndex];
+
+		VkCommandBufferBeginInfo commandBufferBeginInfo = {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+		};
+		vkCheck(vkBeginCommandBuffer(vkFrame.cmdBuf, &commandBufferBeginInfo));
+		{
+			vkCmdBindPipeline(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipeline);
+
+			VkImageMemoryBarrier imageMemoryBarriers[] = {
+				{
+					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+					.srcAccessMask = 0,
+					.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+					.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+					.newLayout = VK_IMAGE_LAYOUT_GENERAL,
+					.srcQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
+					.dstQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
+					.image = vk->colorBuffer.first,
+					.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+				}
+			};
+			vkCmdPipelineBarrier(vkFrame.cmdBuf,
+				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_DEPENDENCY_BY_REGION_BIT,
+				0, nullptr, 0, nullptr, countof(imageMemoryBarriers), imageMemoryBarriers
+			);
+
+			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+				.descriptorPool = vkFrame.descriptorPool,
+				.descriptorSetCount = 1,
+				.pSetLayouts = &vk->rayTracingDescriptorSet0Layout
+			};
+			VkDescriptorSet descriptorSet;
+			vkCheck(vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet));
+			VkDescriptorImageInfo accumulationBufferImageInfo = {
+				.sampler = nullptr,
+				.imageView = vk->accumulationBuffer.second,
+				.imageLayout = VK_IMAGE_LAYOUT_GENERAL
+			};
+			VkDescriptorImageInfo colorBufferImageInfo = {
+				.sampler = nullptr,
+				.imageView = vk->colorBuffer.second,
+				.imageLayout = VK_IMAGE_LAYOUT_GENERAL
+			};
+			VkWriteDescriptorSetAccelerationStructureKHR accelerationStructInfo = {
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+				.accelerationStructureCount = 1,
+				.pAccelerationStructures = &tlas
+			};
+			VkDescriptorBufferInfo verticesBufferInfos = { .buffer = verticesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo indicesBufferInfos = { .buffer = indicesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo geometriesBufferInfos = { .buffer = geometriesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo materialsBufferInfos = { .buffer = materialsBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo instancesBufferInfos = { .buffer = instancesBuffer, .range = VK_WHOLE_SIZE };
+			std::vector<VkDescriptorImageInfo> textureImageInfos(vk->rayTracingDescriptorSet0TextureCount);
+			for (auto [i, info] : enumerate(textureImageInfos)) {
+				if (i < textures.size()) {
+					info = {
+						.sampler = vk->trilinearSampler,
+						.imageView = textures[i].second,
+						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+					};
+				}
+				else {
+					info = {
+						.sampler = vk->trilinearSampler,
+						.imageView = vk->blankTexture.second,
+						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+					};
+				}
+			}
+			VkWriteDescriptorSet descriptorSetWrites[] = {
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &accumulationBufferImageInfo },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &colorBufferImageInfo },
+				{ .pNext = &accelerationStructInfo, .descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &verticesBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &indicesBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &geometriesBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &materialsBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &instancesBufferInfos },
+				{ .descriptorCount = (uint32)textureImageInfos.size(), .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = textureImageInfos.data() }
+			};
+			for (auto [i, setWrite] : enumerate(descriptorSetWrites)) {
+				setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				setWrite.dstSet = descriptorSet;
+				setWrite.dstBinding = (uint32)i;
+				if (setWrite.descriptorCount == 0) setWrite.descriptorCount = 1;
+			}
+			vkUpdateDescriptorSets(vk->device, countof(descriptorSetWrites), descriptorSetWrites, 0, nullptr);
+			vkCmdBindDescriptorSets(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
+			static uint32 frameCount = 0;
+			struct { 
+				XMMATRIX screenToWorldMat; XMVECTOR eyePos; uint32 frameCount; 
+			} pushConsts = {
+				XMMatrixInverse(nullptr, camera.viewProjMat), camera.position, frameCount
+			};
+			vkCmdPushConstants(vkFrame.cmdBuf, vk->rayTracingPipelineLayout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(pushConsts), &pushConsts);
+			frameCount += 1;
+
+			vkCmdTraceRays(vkFrame.cmdBuf,
+				&vk->rayTracingSBTBufferRayGenDeviceAddress,
+				&vk->rayTracingSBTBufferMissDeviceAddress,
+				&vk->rayTracingSBTBufferHitGroupDeviceAddress,
+				&vk->rayTracingSBTBufferHitGroupDeviceAddress,
+				windowWidth, windowHeight, 1
+			);
+
+			imageMemoryBarriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			imageMemoryBarriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			imageMemoryBarriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+			imageMemoryBarriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			vkCmdPipelineBarrier(vkFrame.cmdBuf,
+				VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT,
+				0, nullptr, 0, nullptr, countof(imageMemoryBarriers), imageMemoryBarriers
+			);
+		}
+	}
+};

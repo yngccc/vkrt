@@ -42,5 +42,7 @@ void main() {
 		textureColor = textureLod(textures[material.baseColorTextureIndex], uv, 0).rgb;
 	}
 
+	primaryRayPayload.position = position;
+	primaryRayPayload.normal = normal;
 	primaryRayPayload.color = material.baseColorFactor * textureColor;
 }

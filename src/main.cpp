@@ -31,15 +31,15 @@ void imguiInit() {
 
 int main(int argc, char** argv) {
 	setCurrentDirToExeDir();
-	if (SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE) != S_OK) {
-		fatal("SetProcessDpiAwareness failed");
+	if (SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE) != S_OK) {
+		assert(false && "SetProcessDpiAwareness error");
 	}
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-		fatal("SDL_Init failed");
+		assert(false && "SDL_Init error");
 	}
 	SDL_DisplayMode displayMode;
 	if (SDL_GetCurrentDisplayMode(0, &displayMode) != 0) {
-		fatal("SDL_GetCurrentDisplayMode failed");
+		assert(false && "SDL_GetCurrentDisplayMode error");
 	}
 	SDL_Window* window = SDL_CreateWindow(
 		"vkrt", 
@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
 		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 	);
 	if (!window) {
-		fatal("SDL_CreateWindow failed: "s + SDL_GetError());
+		assert(false && "SDL_CreateWindow error");
 	}
 
 	imguiInit();
@@ -58,6 +58,7 @@ int main(int argc, char** argv) {
 
 	SDL_Event event;
 	bool running = true;
+
 	while (running) {
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT) {
@@ -78,7 +79,7 @@ int main(int argc, char** argv) {
 				}
 			}
 			else if (event.type == SDL_MOUSEMOTION) {
-				imguiIO.MousePos = { float(event.motion.x), float(event.motion.y) };
+				imguiIO.MousePos = { (float)event.motion.x, (float)event.motion.y };
 			}
 			else if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) {
 				int button = -1;
@@ -92,7 +93,7 @@ int main(int argc, char** argv) {
 		int windowWidth, windowHeight;
 		SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 		{
-			ImGui::GetIO().DisplaySize = { float(windowWidth), float(windowHeight) };
+			ImGui::GetIO().DisplaySize = { (float)windowWidth, (float)windowHeight };
 			ImGui::NewFrame();
 			ImGui::Begin("test");
 			ImGui::End();
@@ -106,178 +107,23 @@ int main(int argc, char** argv) {
 
 		vkCheck(vkWaitForFences(vk->device, 1, &vkFrame.queueFence, true, UINT64_MAX));
 		vkCheck(vkResetFences(vk->device, 1, &vkFrame.queueFence));
-		vkCheck(vkResetCommandBuffer(vkFrame.cmdBuffer, 0));
+		vkCheck(vkResetCommandBuffer(vkFrame.cmdBuf, 0));
 		vkCheck(vkResetDescriptorPool(vk->device, vkFrame.descriptorPool, 0));
 
 		uint8* uniformBuffersMappedMemory;
 		vkCheck(vkMapMemory(vk->device, vkFrame.uniformBuffersMemory.memory, 0, VK_WHOLE_SIZE, 0, (void**)&uniformBuffersMappedMemory));
 
-		VkCommandBufferBeginInfo commandBufferBeginInfo = {
-			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-		};
-		vkCheck(vkBeginCommandBuffer(vkFrame.cmdBuffer, &commandBufferBeginInfo));
-		{
-			vkCmdBindPipeline(vkFrame.cmdBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipeline);
-			
-			VkImageMemoryBarrier colorBufferImageMemoryBarrier = {
-				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-				.srcAccessMask = 0,
-				.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-				.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-				.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-				.srcQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
-				.dstQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
-				.image = vk->colorBufferTexture.first,
-				.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
-			};
-			vkCmdPipelineBarrier(
-				vkFrame.cmdBuffer,
-				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_DEPENDENCY_BY_REGION_BIT,
-				0, nullptr, 0, nullptr, 1, &colorBufferImageMemoryBarrier
-			);
+		scene->drawCommands(vk, windowWidth, windowHeight);
 
-			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
-				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-				.descriptorPool = vkFrame.descriptorPool,
-				.descriptorSetCount = 1,
-				.pSetLayouts = &vk->rayTracingDescriptorSet0Layout
-			};
-			VkDescriptorSet descriptorSet;
-			vkCheck(vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet));
-			VkDescriptorImageInfo colorBufferImageInfo = { 
-				.sampler = nullptr,
-				.imageView = vk->colorBufferTexture.second,
-				.imageLayout = VK_IMAGE_LAYOUT_GENERAL
-			};
-			VkWriteDescriptorSetAccelerationStructureKHR accelerationStructInfo = {
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
-				.accelerationStructureCount = 1,
-				.pAccelerationStructures = &scene->tlas
-			};
-			VkDescriptorBufferInfo verticesBufferInfos = {
-					.buffer = scene->verticesBuffer,
-					.range = VK_WHOLE_SIZE
-			};
-			VkDescriptorBufferInfo indicesBufferInfos = {
-					.buffer = scene->indicesBuffer,
-					.range = VK_WHOLE_SIZE
-			};
-			VkDescriptorBufferInfo geometriesBufferInfos = {
-					.buffer = scene->geometriesBuffer,
-					.range = VK_WHOLE_SIZE
-			};
-			VkDescriptorBufferInfo materialsBufferInfos = {
-					.buffer = scene->materialsBuffer,
-					.range = VK_WHOLE_SIZE
-			};
-			VkDescriptorBufferInfo instancesBufferInfos = {
-					.buffer = scene->instancesBuffer,
-					.range = VK_WHOLE_SIZE
-			};
-			std::vector<VkDescriptorImageInfo> textureImageInfos(vk->rayTracingDescriptorSet0TextureCount);
-			for (auto [i, info] : enumerate(textureImageInfos)) {
-				if (i < scene->textures.size()) {
-					info = {
-						.sampler = vk->colorBufferTextureSampler,
-						.imageView = scene->textures[i].second,
-						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-					};
-				}
-				else {
-					info = {
-						.sampler = vk->blankTextureSampler,
-						.imageView = vk->blankTexture.second,
-						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-					};
-				}
-			}
-			VkWriteDescriptorSet descriptorSetWrites[] = {
-				{
-					.descriptorCount = 1,
-					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-					.pImageInfo = &colorBufferImageInfo
-				},
-				{
-					.pNext = &accelerationStructInfo,
-					.descriptorCount = 1,
-					.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-				},
-				{
-					.descriptorCount = 1,
-					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-					.pBufferInfo = &verticesBufferInfos
-				},
-				{
-					.descriptorCount = 1,
-					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-					.pBufferInfo = &indicesBufferInfos
-				},
-				{
-					.descriptorCount = 1,
-					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-					.pBufferInfo = &geometriesBufferInfos
-				},
-				{
-					.descriptorCount = 1,
-					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-					.pBufferInfo = &materialsBufferInfos
-				},
-				{
-					.descriptorCount = 1,
-					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-					.pBufferInfo = &instancesBufferInfos
-				},
-				{
-					.descriptorCount = (uint32)textureImageInfos.size(),
-					.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-					.pImageInfo = textureImageInfos.data()
-				}
-			};
-			for (auto [i, setWrite] : enumerate(descriptorSetWrites)) {
-				setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				setWrite.dstSet = descriptorSet;
-				setWrite.dstBinding = (uint32)i;
-			}
-			vkUpdateDescriptorSets(vk->device, countof(descriptorSetWrites), descriptorSetWrites, 0, nullptr);
-			vkCmdBindDescriptorSets(vkFrame.cmdBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-
-			struct { 
-				XMMATRIX screenToWorldMat;
-				XMVECTOR eyePos;
-			} pushConsts = {
-				XMMatrixInverse(nullptr, scene->camera.viewProjMat), scene->camera.position
-			};
-			vkCmdPushConstants(vkFrame.cmdBuffer, vk->rayTracingPipelineLayout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(pushConsts), &pushConsts);
-
-			vkCmdTraceRays(
-				vkFrame.cmdBuffer, 
-				&vk->rayTracingSBTBufferRayGenDeviceAddress, 
-				&vk->rayTracingSBTBufferMissDeviceAddress, 
-				&vk->rayTracingSBTBufferHitGroupDeviceAddress, 
-				&vk->rayTracingSBTBufferHitGroupDeviceAddress, 
-				(uint32)windowWidth, (uint32)windowHeight, 1
-			);
-
-			colorBufferImageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-			colorBufferImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			colorBufferImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-			colorBufferImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			vkCmdPipelineBarrier(
-				vkFrame.cmdBuffer,
-				VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT,
-				0, nullptr, 0, nullptr, 1, &colorBufferImageMemoryBarrier
-			);
-		}
 		VkRenderPassBeginInfo renderPassBeginInfo = {
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 			.renderPass = vk->swapChainRenderPass,
 			.framebuffer = vk->swapChainImageFramebuffers[swapChainImageIndex].frameBuffer,
 			.renderArea = { {0, 0}, vk->swapChainImageFramebuffers[swapChainImageIndex].imageExtent }
 		};
-		vkCmdBeginRenderPass(vkFrame.cmdBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(vkFrame.cmdBuf, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		{
-			vkCmdBindPipeline(vkFrame.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->swapChainPipeline);
+			vkCmdBindPipeline(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->swapChainPipeline);
 
 			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -288,8 +134,8 @@ int main(int argc, char** argv) {
 			VkDescriptorSet descriptorSet;
 			vkCheck(vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet));
 			VkDescriptorImageInfo descriptorImageInfo = { 
-				.sampler = vk->colorBufferTextureSampler, 
-				.imageView = vk->colorBufferTexture.second,
+				.sampler = vk->trilinearSampler,
+				.imageView = vk->colorBuffer.second,
 				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			};
 			VkWriteDescriptorSet writeDescriptorSet = {
@@ -301,15 +147,15 @@ int main(int argc, char** argv) {
 				.pImageInfo = &descriptorImageInfo
 			};
 			vkUpdateDescriptorSets(vk->device, 1, &writeDescriptorSet, 0, nullptr);
-			vkCmdBindDescriptorSets(vkFrame.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->swapChainPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			vkCmdBindDescriptorSets(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->swapChainPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
-			vkCmdDraw(vkFrame.cmdBuffer, 3, 1, 0, 0);
+			vkCmdDraw(vkFrame.cmdBuf, 3, 1, 0, 0);
 		}
 		{
-			vkCmdBindPipeline(vkFrame.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->imguiPipeline);
+			vkCmdBindPipeline(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->imguiPipeline);
 
-			struct { float windowSize[2]; } pushConsts = { {float(windowWidth), float(windowHeight)} };
-			vkCmdPushConstants(vkFrame.cmdBuffer, vk->imguiPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushConsts), &pushConsts);
+			struct { float windowSize[2]; } pushConsts = { {(float)windowWidth, (float)windowHeight} };
+			vkCmdPushConstants(vkFrame.cmdBuf, vk->imguiPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushConsts), &pushConsts);
 
 			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -320,7 +166,7 @@ int main(int argc, char** argv) {
 			VkDescriptorSet descriptorSet;
 			vkCheck(vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet));
 			VkDescriptorImageInfo descriptorImageInfo = {
-				.sampler = vk->imguiTextureSampler,
+				.sampler = vk->trilinearSampler,
 				.imageView = vk->imguiTexture.second,
 				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			};
@@ -333,10 +179,10 @@ int main(int argc, char** argv) {
 				.pImageInfo = &descriptorImageInfo
 			};
 			vkUpdateDescriptorSets(vk->device, 1, &writeDescriptorSet, 0, nullptr);
-			vkCmdBindDescriptorSets(vkFrame.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->imguiPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			vkCmdBindDescriptorSets(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->imguiPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(vkFrame.cmdBuffer, 0, 1, &vkFrame.imguiVertBuffer, &offset);
-			vkCmdBindIndexBuffer(vkFrame.cmdBuffer, vkFrame.imguiIdxBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindVertexBuffers(vkFrame.cmdBuf, 0, 1, &vkFrame.imguiVertBuffer, &offset);
+			vkCmdBindIndexBuffer(vkFrame.cmdBuf, vkFrame.imguiIdxBuffer, 0, VK_INDEX_TYPE_UINT16);
 
 			uint64 vertBufferOffset = 0;
 			uint64 idxBufferOffset = 0;
@@ -356,8 +202,8 @@ int main(int argc, char** argv) {
 						if (clipRect.x < 0) clipRect.x = 0;
 						if (clipRect.y < 0) clipRect.y = 0;
 						VkRect2D scissor = { { (int32)clipRect.x, (int32)clipRect.y }, { (uint32)(clipRect.z - clipRect.x), (uint32)(clipRect.w - clipRect.y) } };
-						vkCmdSetScissor(vkFrame.cmdBuffer, 0, 1, &scissor);
-						vkCmdDrawIndexed(vkFrame.cmdBuffer, drawCmd.ElemCount, 1, (uint32)idxIndex, (int32)vertIndex, 0);
+						vkCmdSetScissor(vkFrame.cmdBuf, 0, 1, &scissor);
+						vkCmdDrawIndexed(vkFrame.cmdBuf, drawCmd.ElemCount, 1, (uint32)idxIndex, (int32)vertIndex, 0);
 					}
 					idxIndex += drawCmd.ElemCount;
 				}
@@ -367,8 +213,8 @@ int main(int argc, char** argv) {
 				assert(idxBufferOffset < vkFrame.imguiIdxBufferMemorySize);
 			}
 		}
-		vkCmdEndRenderPass(vkFrame.cmdBuffer);
-		vkCheck(vkEndCommandBuffer(vkFrame.cmdBuffer));
+		vkCmdEndRenderPass(vkFrame.cmdBuf);
+		vkCheck(vkEndCommandBuffer(vkFrame.cmdBuf));
 
 		vkUnmapMemory(vk->device, vkFrame.uniformBuffersMemory.memory);
 
@@ -379,7 +225,7 @@ int main(int argc, char** argv) {
 			.pWaitSemaphores = &vkFrame.swapChainImageSemaphore,
 			.pWaitDstStageMask = &pipelineStageFlags,
 			.commandBufferCount = 1,
-			.pCommandBuffers = &vkFrame.cmdBuffer,
+			.pCommandBuffers = &vkFrame.cmdBuf,
 			.signalSemaphoreCount = 1,
 			.pSignalSemaphores = &vkFrame.queueSemaphore
 		};

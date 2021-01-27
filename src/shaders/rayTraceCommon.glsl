@@ -34,11 +34,12 @@ struct Material {
 	uint emissiveTextureIndex;
 };
 
-layout(set = 0, binding = 0, rgba32f) uniform image2D image;
-layout(set = 0, binding = 1) uniform accelerationStructureEXT tlas;
-layout(set = 0, binding = 2, scalar) buffer Vertices { Vertex vertices[]; };
-layout(set = 0, binding = 3) buffer Indices { uint16_t indices[]; };
-layout(set = 0, binding = 4, scalar) buffer Geometries { Geometry geometries[]; };
-layout(set = 0, binding = 5, scalar) buffer Materials { Material materials[]; };
-layout(set = 0, binding = 6, scalar) buffer Instances { Instance instances[]; };
-layout(set = 0, binding = 7) uniform sampler2D textures[];
+layout(set = 0, binding = 0, rgba32f) uniform image2D accumulationBuffer;
+layout(set = 0, binding = 1, rgba16f) uniform image2D colorBuffer;
+layout(set = 0, binding = 2) uniform accelerationStructureEXT tlas;
+layout(set = 0, binding = 3, scalar) buffer Vertices { Vertex vertices[]; };
+layout(set = 0, binding = 4) buffer Indices { uint16_t indices[]; };
+layout(set = 0, binding = 5, scalar) buffer Geometries { Geometry geometries[]; };
+layout(set = 0, binding = 6, scalar) buffer Materials { Material materials[]; };
+layout(set = 0, binding = 7, scalar) buffer Instances { Instance instances[]; };
+layout(set = 0, binding = 8) uniform sampler2D textures[];
