@@ -45,15 +45,15 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SDL_SDK_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(IncludePath)</IncludePath>
-    <LibraryPath>$(SDL_SDK_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SDL_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(FBX_PATH)\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SDL_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(FBX_PATH)\lib\vs2017\x64\debug;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SDL_SDK_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(IncludePath)</IncludePath>
-    <LibraryPath>$(SDL_SDK_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SDL_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(FBX_PATH)\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SDL_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(FBX_PATH)\lib\vs2017\x64\release;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
@@ -61,7 +61,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
@@ -81,7 +81,7 @@
       </Command>
     </PreBuildEvent>
     <CustomBuildStep>
-      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
+      <Command>xcopy /y /d  "$(SDL_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
 call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
@@ -92,7 +92,7 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
@@ -114,17 +114,13 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       </Command>
     </PreBuildEvent>
     <CustomBuildStep>
-      <Command>xcopy /y /d  "$(SDL_SDK_PATH)\lib\x64\SDL2.dll" "$(OutDir)"</Command>
+      <Command>xcopy /y /d  "$(SDL_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
+call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\src\common.h" />
-    <ClInclude Include="..\src\scene.h" />
-    <ClInclude Include="..\src\vk.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\shaders\common.glsl" />

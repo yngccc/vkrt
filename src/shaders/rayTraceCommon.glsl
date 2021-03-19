@@ -34,7 +34,7 @@ struct Material {
 	uint emissiveTextureIndex;
 };
 
-layout(set = 0, binding = 0, rgba32f) uniform image2D accumulationBuffer;
+layout(set = 0, binding = 0, rgba32f) uniform image2D accumulationColorBuffer;
 layout(set = 0, binding = 1, rgba16f) uniform image2D colorBuffer;
 layout(set = 0, binding = 2) uniform accelerationStructureEXT tlas;
 layout(set = 0, binding = 3, scalar) buffer Vertices { Vertex vertices[]; };

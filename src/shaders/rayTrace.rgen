@@ -6,7 +6,7 @@
 layout(push_constant) uniform pushConstant {
 	mat4 screenToWorldMat;
 	vec4 eyePos;
-	uint frameCount;
+	uint accumulatedFrameCount;
 };
 
 vec3 getPixelWorldPos(in uvec2 resolution, in uvec2 pixelIndex) {
@@ -27,17 +27,17 @@ void main() {
 	vec3 rayDir = normalize(getPixelWorldPos(resolution, pixelIndex) - eyePos.xyz);
 	traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, eyePos.xyz, 0, rayDir, 1000, 0);
 
-	rngSeed = (pixelIndex.x * 1973 + pixelIndex.y * 9277 + frameCount * 26699) | 1;
+	rngSeed = (pixelIndex.x * 1973 + pixelIndex.y * 9277 + accumulatedFrameCount * 26699) | 1;
 	
-	if (frameCount == 0) {
-		imageStore(accumulationBuffer, ivec2(pixelIndex), vec4(primaryRayPayload.color, 0));
+	if (accumulatedFrameCount == 0) {
+		imageStore(accumulationColorBuffer, ivec2(pixelIndex), vec4(primaryRayPayload.color, 0));
 		imageStore(colorBuffer, ivec2(pixelIndex), vec4(primaryRayPayload.color, 0));
 	}
 	else {
-		vec3 color = vec3(imageLoad(accumulationBuffer, ivec2(pixelIndex)));
+		vec3 color = vec3(imageLoad(accumulationColorBuffer, ivec2(pixelIndex)));
 		color += primaryRayPayload.color;
-		imageStore(accumulationBuffer, ivec2(pixelIndex), vec4(color, 0));
-		color /= frameCount;
+		imageStore(accumulationColorBuffer, ivec2(pixelIndex), vec4(color, 0));
+		color /= accumulatedFrameCount;
 		imageStore(colorBuffer, ivec2(pixelIndex), vec4(color, 0));
 	}
 }

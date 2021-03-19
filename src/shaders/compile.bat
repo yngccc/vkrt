@@ -13,4 +13,3 @@ for %%A in (*.rmiss) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %o
 for %%A in (*.rchit) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %outDir%\%%A.spv
 for %%A in (*.rahit) do %VK_SDK_PATH%\bin\glslangValidator.exe %flags% %%A -o %outDir%\%%A.spv
 popd
-
