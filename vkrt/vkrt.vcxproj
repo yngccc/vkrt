@@ -46,14 +46,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib\debug;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib\release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
@@ -81,7 +81,7 @@
       </Command>
     </PreBuildEvent>
     <CustomBuildStep>
-      <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\debug\SDL2.dll" "$(OutDir)"
+      <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\SDL2.dll" "$(OutDir)"
 call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
@@ -114,7 +114,7 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       </Command>
     </PreBuildEvent>
     <CustomBuildStep>
-      <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\debug\SDL2.dll" "$(OutDir)"
+      <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\SDL2.dll" "$(OutDir)"
 call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
