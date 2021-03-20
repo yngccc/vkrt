@@ -13,33 +13,32 @@ using namespace std::literals;
 
 #include <shellscalingapi.h>
 
-#include <SDL.h>
-#include <SDL_syswm.h>
+#define _XM_SSE4_INTRINSICS_
+#include <directxmath.h>
+#include <directxcolors.h>
+using namespace DirectX;
+
+#include <SDL/SDL.h>
+#include <SDL/SDL_syswm.h>
 
 #define module shaderModule
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
 #undef module
 
-#define _XM_SSE4_INTRINSICS_
-#include <directxmath.h>
-#include <directxcolors.h>
-using namespace DirectX;
-
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include <stb/stb_image.h>
 
 #define CGLTF_IMPLEMENTATION
-#include <cgltf.h>
-
-#include <json.hpp>
-using json = nlohmann::json;
+#include <cgltf/cgltf.h>
 
 #define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include <imgui.cpp>
-#include <imgui_widgets.cpp>
-#include <imgui_draw.cpp>
+#include <imgui/imgui.cpp>
+#include <imgui/imgui_draw.cpp>
+#include <imgui/imgui_widgets.cpp>
+#include <imgui/imgui_tables.cpp>
+
+#include <nlohmann/json.hpp>
 
 typedef unsigned int uint;
 typedef int8_t int8;
@@ -1456,7 +1455,7 @@ struct Scene {
 
 	void loadJson() {
 		std::ifstream file(filePath);
-		json j;
+		nlohmann::json j;
 		file >> j;
 		auto jCamera = j["camera"];
 		if (!jCamera.is_null()) {

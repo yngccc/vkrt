@@ -45,15 +45,15 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SDL_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(FBX_PATH)\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SDL_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(FBX_PATH)\lib\vs2017\x64\debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib\debug;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SDL_PATH)\include;$(VK_SDK_PATH)\include;$(IMGUI_PATH);$(CGLTF_PATH);$(JSON_HPP_PATH);$(STB_PATH);$(FBX_PATH)\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SDL_PATH)\lib\x64;$(VK_SDK_PATH)\lib;$(FBX_PATH)\lib\vs2017\x64\release;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib\release;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
@@ -81,7 +81,7 @@
       </Command>
     </PreBuildEvent>
     <CustomBuildStep>
-      <Command>xcopy /y /d  "$(SDL_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
+      <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\debug\SDL2.dll" "$(OutDir)"
 call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
@@ -114,7 +114,7 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       </Command>
     </PreBuildEvent>
     <CustomBuildStep>
-      <Command>xcopy /y /d  "$(SDL_PATH)\lib\x64\SDL2.dll" "$(OutDir)"
+      <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\debug\SDL2.dll" "$(OutDir)"
 call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
