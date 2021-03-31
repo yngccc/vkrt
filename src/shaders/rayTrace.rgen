@@ -18,16 +18,12 @@ vec3 getPixelWorldPos(in uvec2 resolution, in uvec2 pixelIndex) {
 
 layout(location = 0) rayPayloadEXT PrimaryRayPayload primaryRayPayload;
 
-uint rngSeed;
-
 void main() {
 	uvec2 resolution = gl_LaunchSizeEXT.xy;
 	uvec2 pixelIndex = gl_LaunchIDEXT.xy;
 
 	vec3 rayDir = normalize(getPixelWorldPos(resolution, pixelIndex) - eyePos.xyz);
 	traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, eyePos.xyz, 0, rayDir, 1000, 0);
-
-	rngSeed = (pixelIndex.x * 1973 + pixelIndex.y * 9277 + accumulatedFrameCount * 26699) | 1;
 	
 	if (accumulatedFrameCount == 0) {
 		imageStore(accumulationColorBuffer, ivec2(pixelIndex), vec4(primaryRayPayload.color, 0));

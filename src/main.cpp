@@ -28,6 +28,7 @@ using namespace DirectX;
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
+//#include <stb/stb_ds.h>
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf/cgltf.h>
@@ -149,11 +150,8 @@ struct Vulkan {
 		VkFramebuffer frameBuffer;
 	} swapChainImageFramebuffers[vkSwapChainImageCount];
 
-	uint32 stagingBuffersMemoryType;
-	uint32 gpuColorBuffersMemoryType;
-	uint32 gpuTexturesMemoryType;
-	uint32 gpuBuffersMemoryType;
-	uint32 uniformBuffersMemoryType;
+	uint32 hostVisibleCoherentMemoryType;
+	uint32 deviceLocalMemoryType;
 
 	struct Memory {
 		VkDeviceMemory memory;
@@ -553,35 +551,19 @@ struct Vulkan {
 			VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
 			vkGetPhysicalDeviceMemoryProperties(vk->physicalDevice, &physicalDeviceMemoryProperties);
 
-			bool stagingBuffersMemoryTypeFound = false;
-			bool gpuColorBuffersMemoryTypeFound = false;
-			bool gpuTexturesMemoryTypeFound = false;
-			bool gpuBuffersMemoryTypeFound = false;
-			bool uniformBuffersMemoryTypeFound = false;
+			vk->hostVisibleCoherentMemoryType = UINT32_MAX;
+			vk->deviceLocalMemoryType = UINT32_MAX;
 			for (uint32 i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++) {
 				VkMemoryType& mtype = physicalDeviceMemoryProperties.memoryTypes[i];
 				if (mtype.propertyFlags == (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-					vk->stagingBuffersMemoryType = i;
-					stagingBuffersMemoryTypeFound = true;
+					vk->hostVisibleCoherentMemoryType = i;
 				}
 				else if (mtype.propertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
-					vk->gpuColorBuffersMemoryType = i;
-					vk->gpuTexturesMemoryType = i;
-					vk->gpuBuffersMemoryType = i;
-					gpuColorBuffersMemoryTypeFound = true;
-					gpuTexturesMemoryTypeFound = true;
-					gpuBuffersMemoryTypeFound = true;
-				}
-				else if (mtype.propertyFlags == (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-					vk->uniformBuffersMemoryType = i;
-					uniformBuffersMemoryTypeFound = true;
+					vk->deviceLocalMemoryType = i;
 				}
 			}
-			assert(stagingBuffersMemoryTypeFound);
-			assert(gpuColorBuffersMemoryTypeFound);
-			assert(gpuTexturesMemoryTypeFound);
-			assert(gpuBuffersMemoryTypeFound);
-			assert(uniformBuffersMemoryTypeFound);
+			assert(vk->hostVisibleCoherentMemoryType != UINT32_MAX);
+			assert(vk->deviceLocalMemoryType != UINT32_MAX);
 			{
 				VkBufferCreateInfo bufferCreateInfo = {
 					.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -594,7 +576,7 @@ struct Vulkan {
 				VkMemoryAllocateInfo memoryAllocateInfo = {
 					.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 					.allocationSize = memoryRequirements.size,
-					.memoryTypeIndex = vk->stagingBuffersMemoryType
+					.memoryTypeIndex = vk->hostVisibleCoherentMemoryType
 				};
 				vkAllocateMemory(vk->device, &memoryAllocateInfo, nullptr, &vk->stagingBuffersMemory.memory);
 				vkBindBufferMemory(vk->device, vk->stagingBuffer, vk->stagingBuffersMemory.memory, 0);
@@ -608,7 +590,7 @@ struct Vulkan {
 				VkMemoryAllocateInfo memoryAllocateInfo = {
 					.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 					.allocationSize = 4_gb,
-					.memoryTypeIndex = vk->gpuTexturesMemoryType
+					.memoryTypeIndex = vk->deviceLocalMemoryType
 				};
 				vkAllocateMemory(vk->device, &memoryAllocateInfo, nullptr, &vk->gpuTexturesMemory.memory);
 				vk->gpuTexturesMemory.capacity = memoryAllocateInfo.allocationSize;
@@ -743,7 +725,7 @@ struct Vulkan {
 						.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 						.pNext = &memoryAllocateFlagsInfo,
 						.allocationSize = 1_gb,
-						.memoryTypeIndex = vk->gpuBuffersMemoryType
+						.memoryTypeIndex = vk->deviceLocalMemoryType
 				};
 				vkAllocateMemory(vk->device, &memoryAllocateInfo, nullptr, &vk->gpuBuffersMemory.memory);
 				vk->gpuBuffersMemory.capacity = memoryAllocateInfo.allocationSize;
@@ -797,7 +779,7 @@ struct Vulkan {
 				VkMemoryAllocateInfo memoryAllocateInfo = {
 					.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 					.allocationSize = 64_mb,
-					.memoryTypeIndex = vk->uniformBuffersMemoryType
+					.memoryTypeIndex = vk->hostVisibleCoherentMemoryType
 				};
 				vkAllocateMemory(vk->device, &memoryAllocateInfo, nullptr, &frame.uniformBuffersMemory.memory);
 				frame.uniformBuffersMemory.capacity = memoryAllocateInfo.allocationSize;
@@ -1129,7 +1111,7 @@ struct Vulkan {
 		VkMemoryAllocateInfo memoryAllocateInfo = {
 			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 			.allocationSize = align(MemoryRequirements[0].size, MemoryRequirements[1].alignment) + MemoryRequirements[1].size,
-			.memoryTypeIndex = gpuColorBuffersMemoryType
+			.memoryTypeIndex = deviceLocalMemoryType
 		};
 		vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &gpuColorBuffersMemory.memory);
 		gpuColorBuffersMemory.capacity = memoryAllocateInfo.allocationSize;
@@ -2109,15 +2091,15 @@ struct Scene {
 				}
 			}
 			VkWriteDescriptorSet descriptorSetWrites[] = {
-				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &accumulationBufferImageInfo },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &colorBufferImageInfo },
-				{.pNext = &accelerationStructInfo, .descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &verticesBufferInfos },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &indicesBufferInfos },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &geometriesBufferInfos },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &materialsBufferInfos },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &instancesBufferInfos },
-				{.descriptorCount = (uint32)textureImageInfos.size(), .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = textureImageInfos.data() }
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &accumulationBufferImageInfo },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &colorBufferImageInfo },
+				{ .pNext = &accelerationStructInfo, .descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &verticesBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &indicesBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &geometriesBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &materialsBufferInfos },
+				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &instancesBufferInfos },
+				{ .descriptorCount = (uint32)textureImageInfos.size(), .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = textureImageInfos.data() }
 			};
 			for (size_t i = 0; i < countof(descriptorSetWrites); i++) {
 				auto& setWrite = descriptorSetWrites[i];
@@ -2130,9 +2112,13 @@ struct Scene {
 			vkCmdBindDescriptorSets(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 			struct {
-				XMMATRIX screenToWorldMat; XMVECTOR eyePos; uint32 accumulatedFrameCount;
+				XMMATRIX screenToWorldMat; 
+				XMVECTOR eyePos; 
+				uint32 accumulatedFrameCount;
 			} pushConsts = {
-				XMMatrixInverse(nullptr, camera.viewProjMat), camera.position, vk->accumulatedFrameCount
+				XMMatrixInverse(nullptr, camera.viewProjMat), 
+				camera.position, 
+				vk->accumulatedFrameCount
 			};
 			vkCmdPushConstants(vkFrame.cmdBuf, vk->rayTracingPipelineLayout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(pushConsts), &pushConsts);
 			vk->accumulatedFrameCount++;

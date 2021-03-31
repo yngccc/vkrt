@@ -18,23 +18,19 @@ vec4 barycentric(in vec4 attribs[3], in vec2 barycentric) {
 	return attribs[0] + barycentric.x * (attribs[1] - attribs[0]) + barycentric.y * (attribs[2] - attribs[0]);
 }
 
-uint wangHash(inout uint seed) {
-    seed = (seed ^ 61) ^ (seed >> 16);
-    seed *= 9;
-    seed = seed ^ (seed >> 4);
-    seed *= 0x27d4eb2d;
-    seed = seed ^ (seed >> 15);
-    return seed;
+uint wang_hash(uint x) {
+    x = (x ^ 61) ^ (x >> 16);
+    x *= 9;
+    x = x ^ (x >> 4);
+    x *= 0x27d4eb2d;
+    x = x ^ (x >> 15);
+    return x;
 }
 
 float iqint3(uvec2 x) {
     uvec2 q = 1103515245U * ((x >> 1U) ^ (x.yx));
     uint  n = 1103515245U * ((q.x) ^ (q.y >> 3U));
     return float(n) * (1.0 / float(0xffffffffU));
-}
-
-float randomFloat01(inout uint seed) {
-    return float(wangHash(seed)) / 4294967296.0f;
 }
 
 mat3 orthonormalBasisFrisvad(vec3 normal) {
@@ -75,5 +71,3 @@ vec3 sampleCosHemisphere(vec2 uv, out float PDF) {
     PDF = cos(theta) * (1 / PI);
     return vec3(disk.x, sqrt(max(0.0, 1.0 - dot(disk, disk))), -disk.y);
 }
-
-
