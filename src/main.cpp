@@ -181,6 +181,9 @@ struct Vulkan {
 		VkFence queueFence;
 		VkDescriptorPool descriptorPool;
 		Memory uniformBuffersMemory;
+		VkBuffer rayTracingConstantBuffer;
+		uint64 rayTracingConstantBufferMemoryOffset;
+		uint64 rayTracingConstantBufferMemorySize;
 		VkBuffer imguiVertBuffer;
 		uint64 imguiVertBufferMemoryOffset;
 		uint64 imguiVertBufferMemorySize;
@@ -188,7 +191,7 @@ struct Vulkan {
 		uint64 imguiIndexBufferMemoryOffset;
 		uint64 imguiIndexBufferMemorySize;
 	} frames[vkMaxFrameInFlight];
-	
+
 	uint64 frameCount;
 	uint64 frameIndex;
 	uint32 accumulatedFrameCount;
@@ -785,6 +788,10 @@ struct Vulkan {
 				frame.uniformBuffersMemory.capacity = memoryAllocateInfo.allocationSize;
 				frame.uniformBuffersMemory.offset = 0;
 
+				frame.rayTracingConstantBufferMemorySize = 1_kb;
+				std::tie(frame.rayTracingConstantBuffer, frame.rayTracingConstantBufferMemoryOffset) =
+					vk->createBuffer(&frame.uniformBuffersMemory, frame.rayTracingConstantBufferMemorySize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
 				frame.imguiVertBufferMemorySize = 2_mb;
 				std::tie(frame.imguiVertBuffer, frame.imguiVertBufferMemoryOffset) =
 					vk->createBuffer(&frame.uniformBuffersMemory, frame.imguiVertBufferMemorySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -863,8 +870,9 @@ struct Vulkan {
 			colorBlendState.attachmentCount = 1;
 			colorBlendState.pAttachments = &colorBlendAttachmentState;
 
-			VkDescriptorSetLayoutBinding swapChainDescriptorSetBindings[1] = {
-				{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}
+			VkDescriptorSetLayoutBinding swapChainDescriptorSetBindings[] = {
+				{0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+				{1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
 			};
 			descriptorSetLayoutCreateInfo.bindingCount = countof(swapChainDescriptorSetBindings);
 			descriptorSetLayoutCreateInfo.pBindings = swapChainDescriptorSetBindings;
@@ -916,7 +924,8 @@ struct Vulkan {
 			dynamicState.pDynamicStates = &dynamicScissor;
 
 			VkDescriptorSetLayoutBinding imguiDescriptorSetBindings[] = {
-				{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT }
+				{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
+				{.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
 			};
 			descriptorSetLayoutCreateInfo.bindingCount = countof(imguiDescriptorSetBindings);
 			descriptorSetLayoutCreateInfo.pBindings = imguiDescriptorSetBindings;
@@ -947,28 +956,28 @@ struct Vulkan {
 				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
 				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
 				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = vk->rayTracingDescriptorSet0TextureCount, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR }
+				{.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = vk->rayTracingDescriptorSet0TextureCount, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
 			};
 			for (uint32 i = 0; i < countof(descriptorSetBindings); i++) {
 				descriptorSetBindings[i].binding = (uint32)i;
-				if (descriptorSetBindings[i].descriptorCount == 0) descriptorSetBindings[i].descriptorCount = 1;
+				if (descriptorSetBindings[i].descriptorCount == 0) {
+					descriptorSetBindings[i].descriptorCount = 1;
+				}
 			}
 
 			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
-				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = countof(descriptorSetBindings), .pBindings = descriptorSetBindings
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+				.bindingCount = countof(descriptorSetBindings),
+				.pBindings = descriptorSetBindings,
 			};
 			vkCreateDescriptorSetLayout(vk->device, &descriptorSetLayoutCreateInfo, nullptr, &vk->rayTracingDescriptorSet0Layout);
-
-			VkPushConstantRange pushConstantRange = {
-				.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR, .offset = 0, .size = 128
-			};
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
 				.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 				.setLayoutCount = 1,
 				.pSetLayouts = &vk->rayTracingDescriptorSet0Layout,
-				.pushConstantRangeCount = 1,
-				.pPushConstantRanges = &pushConstantRange
 			};
 			vkCreatePipelineLayout(vk->device, &pipelineLayoutCreateInfo, nullptr, &vk->rayTracingPipelineLayout);
 
@@ -982,7 +991,9 @@ struct Vulkan {
 			std::vector<char> rayMissShaderCode = readFile("rayTrace.rmiss.spv");
 			std::vector<char> rayChitShaderCode = readFile("rayTrace.rchit.spv");
 			VkShaderModuleCreateInfo shaderModuleCreateInfo = {
-				.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = rayGenShaderCode.size(), .pCode = (uint32*)rayGenShaderCode.data()
+				.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, 
+				.codeSize = rayGenShaderCode.size(), 
+				.pCode = (uint32*)rayGenShaderCode.data(),
 			};
 			vkCreateShaderModule(vk->device, &shaderModuleCreateInfo, nullptr, &shaderStageCreateInfos[0].shaderModule);
 			shaderModuleCreateInfo.codeSize = rayMissShaderCode.size();
@@ -2023,28 +2034,19 @@ struct Scene {
 		}
 	}
 
-	void drawCommands(Vulkan* vk, uint windowWidth, uint windowHeight) {
+	void drawCommands(Vulkan* vk, uint8* uniformBufferPtr, uint windowWidth, uint windowHeight) {
 		auto& vkFrame = vk->frames[vk->frameIndex];
 		{
-			vkCmdBindPipeline(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipeline);
-
-			VkImageMemoryBarrier imageMemoryBarriers[] = {
-				{
-					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-					.srcAccessMask = 0,
-					.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-					.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-					.srcQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
-					.dstQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
-					.image = vk->colorBuffer.first,
-					.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
-				}
+			struct {
+				XMMATRIX screenToWorldMat;
+				XMVECTOR eyePos;
+				uint32 accumulatedFrameCount;
+			} constantsBuffer = {
+				XMMatrixInverse(nullptr, camera.viewProjMat),
+				camera.position,
+				vk->accumulatedFrameCount
 			};
-			vkCmdPipelineBarrier(vkFrame.cmdBuf,
-				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_DEPENDENCY_BY_REGION_BIT,
-				0, nullptr, 0, nullptr, countof(imageMemoryBarriers), imageMemoryBarriers
-			);
+			memcpy(uniformBufferPtr + vkFrame.rayTracingConstantBufferMemoryOffset, &constantsBuffer, sizeof(constantsBuffer));
 
 			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -2067,39 +2069,41 @@ struct Scene {
 				.accelerationStructureCount = 1,
 				.pAccelerationStructures = &tlas
 			};
-			VkDescriptorBufferInfo verticesBufferInfos = { .buffer = verticesBuffer, .range = VK_WHOLE_SIZE };
-			VkDescriptorBufferInfo indicesBufferInfos = { .buffer = indicesBuffer, .range = VK_WHOLE_SIZE };
-			VkDescriptorBufferInfo geometriesBufferInfos = { .buffer = geometriesBuffer, .range = VK_WHOLE_SIZE };
-			VkDescriptorBufferInfo materialsBufferInfos = { .buffer = materialsBuffer, .range = VK_WHOLE_SIZE };
-			VkDescriptorBufferInfo instancesBufferInfos = { .buffer = instancesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo verticesBufferInfo = { .buffer = verticesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo indicesBufferInfo = { .buffer = indicesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo geometriesBufferInfo = { .buffer = geometriesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo materialsBufferInfo = { .buffer = materialsBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo instancesBufferInfo = { .buffer = instancesBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorBufferInfo constantsBufferInfo = { .buffer = vkFrame.rayTracingConstantBuffer, .range = VK_WHOLE_SIZE };
+			VkDescriptorImageInfo textureSamplerInfo = { .sampler = vk->trilinearSampler };
 			std::vector<VkDescriptorImageInfo> textureImageInfos(vk->rayTracingDescriptorSet0TextureCount);
 			for (size_t i = 0; i < textureImageInfos.size(); i++) {
 				auto& info = textureImageInfos[i];
 				if (i < textures.size()) {
 					info = {
-						.sampler = vk->trilinearSampler,
 						.imageView = textures[i].second,
 						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 					};
 				}
 				else {
 					info = {
-						.sampler = vk->trilinearSampler,
 						.imageView = vk->blankTexture.second,
 						.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 					};
 				}
 			}
 			VkWriteDescriptorSet descriptorSetWrites[] = {
-				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &accumulationBufferImageInfo },
-				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &colorBufferImageInfo },
-				{ .pNext = &accelerationStructInfo, .descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR },
-				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &verticesBufferInfos },
-				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &indicesBufferInfos },
-				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &geometriesBufferInfos },
-				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &materialsBufferInfos },
-				{ .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &instancesBufferInfos },
-				{ .descriptorCount = (uint32)textureImageInfos.size(), .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = textureImageInfos.data() }
+				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &accumulationBufferImageInfo },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &colorBufferImageInfo },
+				{.pNext = &accelerationStructInfo, .descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &verticesBufferInfo },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &indicesBufferInfo },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &geometriesBufferInfo },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &materialsBufferInfo },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &instancesBufferInfo },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &constantsBufferInfo },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &textureSamplerInfo },
+				{.descriptorCount = (uint32)textureImageInfos.size(), .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .pImageInfo = textureImageInfos.data() }
 			};
 			for (size_t i = 0; i < countof(descriptorSetWrites); i++) {
 				auto& setWrite = descriptorSetWrites[i];
@@ -2109,19 +2113,27 @@ struct Scene {
 				if (setWrite.descriptorCount == 0) setWrite.descriptorCount = 1;
 			}
 			vkUpdateDescriptorSets(vk->device, countof(descriptorSetWrites), descriptorSetWrites, 0, nullptr);
+
+			vkCmdBindPipeline(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipeline);
 			vkCmdBindDescriptorSets(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
-			struct {
-				XMMATRIX screenToWorldMat; 
-				XMVECTOR eyePos; 
-				uint32 accumulatedFrameCount;
-			} pushConsts = {
-				XMMatrixInverse(nullptr, camera.viewProjMat), 
-				camera.position, 
-				vk->accumulatedFrameCount
+			VkImageMemoryBarrier imageMemoryBarriers[] = {
+				{
+					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+					.srcAccessMask = 0,
+					.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+					.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					.newLayout = VK_IMAGE_LAYOUT_GENERAL,
+					.srcQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
+					.dstQueueFamilyIndex = vk->graphicsComputeQueueFamilyIndex,
+					.image = vk->colorBuffer.first,
+					.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+				}
 			};
-			vkCmdPushConstants(vkFrame.cmdBuf, vk->rayTracingPipelineLayout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(pushConsts), &pushConsts);
-			vk->accumulatedFrameCount++;
+			vkCmdPipelineBarrier(vkFrame.cmdBuf,
+				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_DEPENDENCY_BY_REGION_BIT,
+				0, nullptr, 0, nullptr, countof(imageMemoryBarriers), imageMemoryBarriers
+			);
 
 			vkCmdTraceRays(vkFrame.cmdBuf,
 				&vk->rayTracingSBTBufferRayGenDeviceAddress,
@@ -2139,6 +2151,8 @@ struct Scene {
 				VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT,
 				0, nullptr, 0, nullptr, countof(imageMemoryBarriers), imageMemoryBarriers
 			);
+
+			vk->accumulatedFrameCount++;
 		}
 	}
 };
@@ -2251,19 +2265,10 @@ int main(int argc, char** argv) {
 
 		vkWaitForFences(vk->device, 1, &vkFrame.queueFence, true, UINT64_MAX);
 		vkResetFences(vk->device, 1, &vkFrame.queueFence);
-
 		vkResetDescriptorPool(vk->device, vkFrame.descriptorPool, 0);
-		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.descriptorPool = vkFrame.descriptorPool,
-			.descriptorSetCount = 1,
-			.pSetLayouts = &vk->swapChainDescriptorSet0Layout
-		};
-		VkDescriptorSet descriptorSet;
-		vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet);
 
-		uint8* uniformBuffersMappedMemory;
-		vkMapMemory(vk->device, vkFrame.uniformBuffersMemory.memory, 0, VK_WHOLE_SIZE, 0, (void**)&uniformBuffersMappedMemory);
+		uint8* uniformBuffersMappedMemoryPtr;
+		vkMapMemory(vk->device, vkFrame.uniformBuffersMemory.memory, 0, VK_WHOLE_SIZE, 0, (void**)&uniformBuffersMappedMemoryPtr);
 
 		vkResetCommandBuffer(vkFrame.cmdBuf, 0);
 		VkCommandBufferBeginInfo commandBufferBeginInfo = {
@@ -2272,7 +2277,7 @@ int main(int argc, char** argv) {
 		};
 		vkBeginCommandBuffer(vkFrame.cmdBuf, &commandBufferBeginInfo);
 
-		scene->drawCommands(vk, windowWidth, windowHeight);
+		scene->drawCommands(vk, uniformBuffersMappedMemoryPtr, windowWidth, windowHeight);
 
 		VkClearValue clearValue = {
 			.color = {0, 0, 0, 0}
@@ -2289,20 +2294,38 @@ int main(int argc, char** argv) {
 		{
 			vkCmdBindPipeline(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->swapChainPipeline);
 
+			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+				.descriptorPool = vkFrame.descriptorPool,
+				.descriptorSetCount = 1,
+				.pSetLayouts = &vk->swapChainDescriptorSet0Layout
+			};
+			VkDescriptorSet descriptorSet;
+			vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet);
 			VkDescriptorImageInfo descriptorImageInfo = {
 				.sampler = vk->trilinearSampler,
 				.imageView = vk->colorBuffer.second,
 				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			};
-			VkWriteDescriptorSet writeDescriptorSet = {
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = descriptorSet,
-				.dstBinding = 0,
-				.descriptorCount = 1,
-				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.pImageInfo = &descriptorImageInfo
+			VkWriteDescriptorSet writeDescriptorSets[] = {
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = descriptorSet,
+					.dstBinding = 0,
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+					.pImageInfo = &descriptorImageInfo
+				},
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = descriptorSet,
+					.dstBinding = 1,
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+					.pImageInfo = &descriptorImageInfo
+				}
 			};
-			vkUpdateDescriptorSets(vk->device, 1, &writeDescriptorSet, 0, nullptr);
+			vkUpdateDescriptorSets(vk->device, countof(writeDescriptorSets), writeDescriptorSets, 0, nullptr);
 			vkCmdBindDescriptorSets(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->swapChainPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 			vkCmdDraw(vkFrame.cmdBuf, 3, 1, 0, 0);
@@ -2326,16 +2349,27 @@ int main(int argc, char** argv) {
 				.imageView = vk->imguiTexture.second,
 				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			};
-			VkWriteDescriptorSet writeDescriptorSet = {
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = descriptorSet,
-				.dstBinding = 0,
-				.descriptorCount = 1,
-				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.pImageInfo = &descriptorImageInfo
+			VkWriteDescriptorSet writeDescriptorSets[] = {
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = descriptorSet,
+					.dstBinding = 0,
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+					.pImageInfo = &descriptorImageInfo
+				},
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = descriptorSet,
+					.dstBinding = 1,
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+					.pImageInfo = &descriptorImageInfo
+				}
 			};
-			vkUpdateDescriptorSets(vk->device, 1, &writeDescriptorSet, 0, nullptr);
+			vkUpdateDescriptorSets(vk->device, countof(writeDescriptorSets), writeDescriptorSets, 0, nullptr);
 			vkCmdBindDescriptorSets(vkFrame.cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->imguiPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
 			VkDeviceSize offset = 0;
 			vkCmdBindVertexBuffers(vkFrame.cmdBuf, 0, 1, &vkFrame.imguiVertBuffer, &offset);
 			vkCmdBindIndexBuffer(vkFrame.cmdBuf, vkFrame.imguiIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -2347,8 +2381,8 @@ int main(int argc, char** argv) {
 				const ImDrawList& dlist = *drawData->CmdLists[cmdListIndex];
 				uint64 verticesSize = dlist.VtxBuffer.Size * sizeof(ImDrawVert);
 				uint64 indicesSize = dlist.IdxBuffer.Size * sizeof(ImDrawIdx);
-				memcpy(uniformBuffersMappedMemory + vkFrame.imguiVertBufferMemoryOffset + vertBufferOffset, dlist.VtxBuffer.Data, verticesSize);
-				memcpy(uniformBuffersMappedMemory + vkFrame.imguiIndexBufferMemoryOffset + indexBufferOffset, dlist.IdxBuffer.Data, indicesSize);
+				memcpy(uniformBuffersMappedMemoryPtr + vkFrame.imguiVertBufferMemoryOffset + vertBufferOffset, dlist.VtxBuffer.Data, verticesSize);
+				memcpy(uniformBuffersMappedMemoryPtr + vkFrame.imguiIndexBufferMemoryOffset + indexBufferOffset, dlist.IdxBuffer.Data, indicesSize);
 				uint64 vertIndex = vertBufferOffset / sizeof(ImDrawVert);
 				uint64 indexIndex = indexBufferOffset / sizeof(ImDrawIdx);
 				for (int i = 0; i < dlist.CmdBuffer.Size; i++) {

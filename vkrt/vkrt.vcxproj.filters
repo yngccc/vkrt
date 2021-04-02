@@ -23,37 +23,19 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\src\shaders\swapChain.vert">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="..\src\shaders\swapChain.frag">
-      <Filter>Source Files\shaders</Filter>
-    </None>
     <None Include="..\src\shaders\compile.bat">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="..\src\shaders\imgui.frag">
+    <None Include="..\src\shaders\swapChain.slang">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="..\src\shaders\imgui.vert">
+    <None Include="..\src\shaders\common.slang">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="..\src\shaders\rayTrace.rmiss">
+    <None Include="..\src\shaders\imgui.slang">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="..\src\shaders\rayTrace.rchit">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="..\src\shaders\common.glsl">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="..\src\shaders\rayTraceCommon.glsl">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="..\src\shaders\rayTrace.rahit">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="..\src\shaders\rayTrace.rgen">
+    <None Include="..\src\shaders\rayTrace.slang">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>

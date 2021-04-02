@@ -123,19 +123,11 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
     <ClCompile Include="..\src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\src\shaders\common.glsl" />
+    <None Include="..\src\shaders\common.slang" />
     <None Include="..\src\shaders\compile.bat" />
-    <None Include="..\src\shaders\imgui.frag" />
-    <None Include="..\src\shaders\imgui.vert" />
-    <None Include="..\src\shaders\rayTrace.rahit" />
-    <None Include="..\src\shaders\rayTrace.rchit" />
-    <None Include="..\src\shaders\rayTrace.rgen">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="..\src\shaders\rayTrace.rmiss" />
-    <None Include="..\src\shaders\rayTraceCommon.glsl" />
-    <None Include="..\src\shaders\swapChain.frag" />
-    <None Include="..\src\shaders\swapChain.vert" />
+    <None Include="..\src\shaders\imgui.slang" />
+    <None Include="..\src\shaders\rayTrace.slang" />
+    <None Include="..\src\shaders\swapChain.slang" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
