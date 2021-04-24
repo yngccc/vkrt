@@ -7,28 +7,32 @@ struct PrimaryRayPayload {
 };
 
 struct Vertex {
-	float3 position;
-	float3 normal;
+	float4 position;
+	float4 normal;
 	float2 uv;
+	float2 pad0;
 };
 
 struct Geometry {
 	uint vertexOffset;
 	uint indexOffset;
 	uint materialIndex;
+	uint pad0;
 };
 
 struct Instance {
 	float4x4 transform;
 	float4x4 transformIT;
 	uint geometryOffset;
+	uint pad0[3];
 };
 
 struct Material {
-	float3 baseColorFactor;
+	float4 baseColorFactor;
+	float4 emissiveFactor;
 	uint baseColorTextureIndex;
-	float3 emissiveFactor;
 	uint emissiveTextureIndex;
+	uint pad0[2];
 };
 
 struct Constants {
@@ -103,22 +107,21 @@ void closestHitShader(inout PrimaryRayPayload payload, in BuiltInTriangleInterse
 	Vertex vertex1 = vertices[geometry.vertexOffset + vertexIndices[1]];
 	Vertex vertex2 = vertices[geometry.vertexOffset + vertexIndices[2]];
 	
-	float3 positions[3] = { vertex0.position, vertex1.position, vertex2.position };
-	float3 normals[3] = { vertex0.normal, vertex1.normal, vertex2.normal };
+	float3 positions[3] = { vertex0.position.xyz, vertex1.position.xyz, vertex2.position.xyz };
+	float3 normals[3] = { vertex0.normal.xyz, vertex1.normal.xyz, vertex2.normal.xyz };
 	float2 uvs[3] = { vertex0.uv, vertex1.uv, vertex2.uv };
 	
-	float3 position = mul(instance.transform, float4(barycentric(positions, hitAttribs.barycentrics), 1.0)).xyz;
-	float3 normal = mul(instance.transformIT, float4(barycentric(normals, hitAttribs.barycentrics), 0.0)).xyz;
-	float2 uv = barycentric(uvs, hitAttribs.barycentrics);
-	
-	Material material = materials[geometry.materialIndex];
+	float3 position = mul(instance.transform, float4(barycentricLerp(positions, hitAttribs.barycentrics), 1.0)).xyz;
+	float3 normal = mul(instance.transformIT, float4(barycentricLerp(normals, hitAttribs.barycentrics), 0.0)).xyz;
+	float2 uv = barycentricLerp(uvs, hitAttribs.barycentrics);
 	
 	float3 textureColor = { 1, 1, 1 };
+	Material material = materials[geometry.materialIndex];
 	if (material.baseColorTextureIndex != uint32Max) {
 		textureColor = textures[material.baseColorTextureIndex].SampleLevel(sampler, uv, 0).rgb;
 	}
 	
 	payload.position = position;
 	payload.normal = normal;
-	payload.color = material.baseColorFactor * textureColor;	
+	payload.color = material.baseColorFactor.rgb * textureColor;	
 }
