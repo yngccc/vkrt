@@ -12,7 +12,6 @@
 using namespace std::literals;
 
 #include <shellscalingapi.h>
-
 #define _XM_SSE4_INTRINSICS_
 #include <directxmath.h>
 #include <directxcolors.h>
@@ -26,12 +25,15 @@ using namespace DirectX;
 #include <vulkan/vulkan_win32.h>
 #undef module
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
-//#include <stb/stb_ds.h>
+#include <fbx/fbxsdk.h>
+#undef snprintf
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf/cgltf.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+//#include <stb/stb_ds.h>
 
 #define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 #include <imgui/imgui.cpp>

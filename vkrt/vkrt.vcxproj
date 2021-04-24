@@ -45,14 +45,14 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(SolutionDir)\thirdParty\include\fbx;$(IncludePath)</IncludePath>
     <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VK_SDK_PATH)\include;$(SolutionDir)\thirdParty\include;$(SolutionDir)\thirdParty\include\fbx;$(IncludePath)</IncludePath>
     <LibraryPath>$(VK_SDK_PATH)\lib;$(SolutionDir)\thirdParty\lib;$(LibraryPath)</LibraryPath>
     <CustomBuildBeforeTargets>
     </CustomBuildBeforeTargets>
@@ -68,7 +68,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;vulkan-1.lib;Shcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;vulkan-1.lib;Shcore.lib;libfbxsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>
@@ -82,6 +82,7 @@
     </PreBuildEvent>
     <CustomBuildStep>
       <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\SDL2.dll" "$(OutDir)"
+xcopy /y /d  "$(SolutionDir)\thirdParty\lib\libfbxsdk.dll" "$(OutDir)"
 call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
@@ -101,7 +102,7 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;vulkan-1.lib;Shcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;vulkan-1.lib;Shcore.lib;libfbxsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>
@@ -115,6 +116,7 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
     </PreBuildEvent>
     <CustomBuildStep>
       <Command>xcopy /y /d  "$(SolutionDir)\thirdParty\lib\SDL2.dll" "$(OutDir)"
+xcopy /y /d  "$(SolutionDir)\thirdParty\lib\libfbxsdk.dll" "$(OutDir)"
 call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
       <Outputs>$(SolutionDir)dummy.txt;%(Outputs)</Outputs>
     </CustomBuildStep>
