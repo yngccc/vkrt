@@ -128,7 +128,7 @@ call $(SolutionDir)\src\shaders\compile.bat $(OutDir)</Command>
     <None Include="..\src\shaders\common.slang" />
     <None Include="..\src\shaders\compile.bat" />
     <None Include="..\src\shaders\imgui.slang" />
-    <None Include="..\src\shaders\rayTrace.slang" />
+    <None Include="..\src\shaders\pathTrace.slang" />
     <None Include="..\src\shaders\swapChain.slang" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

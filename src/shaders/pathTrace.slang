@@ -6,6 +6,11 @@ struct PrimaryRayPayload {
 	float3 color;
 };
 
+
+struct RayPayload {
+	float3 color;
+};
+
 struct Vertex {
 	float4 position;
 	float4 normal;
@@ -69,7 +74,10 @@ void rayGenShader() {
 	RayDesc rayDesc = { constants.eyePos.xyz, 0, rayDir, 1000 };
 	PrimaryRayPayload primaryRayPayload;
 	TraceRay(tlas, RAY_FLAG_FORCE_OPAQUE, 0xff, 0, 0, 0, rayDesc, primaryRayPayload);
-	
+
+	//random trace ray
+	//weight ray via pdf
+
 	if (constants.accumulatedFrameCount == 0) {
 		accumulationColorBuffer[pixelIndex] = float4(primaryRayPayload.color, 0);
 		colorBuffer[pixelIndex] = float4(primaryRayPayload.color, 0);
@@ -94,7 +102,7 @@ void anyhitShader() {
 }
 
 [shader("closesthit")]
-void closestHitShader(inout PrimaryRayPayload payload, in BuiltInTriangleIntersectionAttributes hitAttribs) {
+void primaryRayClosestHitShader(inout PrimaryRayPayload payload, in BuiltInTriangleIntersectionAttributes hitAttribs) {
 	Instance instance = instances[InstanceID()];
 	Geometry geometry = geometries[GeometryIndex() + instance.geometryOffset];
 	
@@ -123,5 +131,9 @@ void closestHitShader(inout PrimaryRayPayload payload, in BuiltInTriangleInterse
 	
 	payload.position = position;
 	payload.normal = normal;
-	payload.color = material.baseColorFactor.rgb * textureColor;	
+	payload.color = material.baseColorFactor.rgb * textureColor;
+}
+
+[shader("closesthit")]
+void closestHitShader(inout PrimaryRayPayload payload, in BuiltInTriangleIntersectionAttributes hitAttribs) {
 }

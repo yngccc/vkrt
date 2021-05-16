@@ -202,16 +202,17 @@ struct Vulkan {
 	VkPipelineLayout imguiPipelineLayout;
 	VkPipeline imguiPipeline;
 
-	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties;
 	VkPhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructureProperties;
-	VkDescriptorSetLayout rayTracingDescriptorSet0Layout;
-	uint32 rayTracingDescriptorSet0TextureCount;
-	VkPipelineLayout rayTracingPipelineLayout;
-	VkPipeline rayTracingPipeline;
-	VkBuffer rayTracingSBTBuffer;
-	VkStridedDeviceAddressRegionKHR rayTracingSBTBufferRayGenDeviceAddress;
-	VkStridedDeviceAddressRegionKHR rayTracingSBTBufferMissDeviceAddress;
-	VkStridedDeviceAddressRegionKHR rayTracingSBTBufferHitGroupDeviceAddress;
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR pathTracePipelineProps;
+	VkDescriptorSetLayout pathTraceDescriptorSet0Layout;
+	uint32 pathTraceDescriptorSet0TextureCount;
+	VkPipelineLayout pathTracePipelineLayout;
+	VkPipeline pathTracePipeline;
+	VkBuffer pathTraceSBTBuffer;
+	VkStridedDeviceAddressRegionKHR pathTraceSBTBufferRayGenDeviceAddress;
+	VkStridedDeviceAddressRegionKHR pathTraceSBTBufferMissDeviceAddress;
+	VkStridedDeviceAddressRegionKHR pathTraceSBTBufferHitGroupDeviceAddress;
+	VkStridedDeviceAddressRegionKHR pathTraceSBTBufferCallableDeviceAddress;
 
 	static Vulkan* create(SDL_Window* sdlWindow, bool validation) {
 		Vulkan* vk = new Vulkan();
@@ -362,13 +363,13 @@ struct Vulkan {
 				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
 				.pNext = nullptr
 			};
-			vk->rayTracingProperties = {
+			vk->pathTracePipelineProps = {
 				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
 				.pNext = &vk->accelerationStructureProperties
 			};
 			VkPhysicalDeviceProperties2 properties = {
 				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-				.pNext = &vk->rayTracingProperties
+				.pNext = &vk->pathTracePipelineProps
 			};
 			vkGetPhysicalDeviceProperties2(vk->physicalDevice, &properties);
 			assert(properties.properties.limits.maxDescriptorSetSampledImages > 10000);
@@ -855,8 +856,8 @@ struct Vulkan {
 			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 
-			vertexShaderCode = readFile("swapChain.vert.spv");
-			fragmentShaderCode = readFile("swapChain.frag.spv");
+			vertexShaderCode = readFile("swapChain_vert.spv");
+			fragmentShaderCode = readFile("swapChain_frag.spv");
 			shaderModuleCreateInfo.codeSize = vertexShaderCode.size();
 			shaderModuleCreateInfo.pCode = (uint32*)vertexShaderCode.data();
 			vkCreateShaderModule(vk->device, &shaderModuleCreateInfo, nullptr, &vertFragStages[0].shaderModule);
@@ -903,8 +904,8 @@ struct Vulkan {
 			graphicsPipelineCreateInfo.subpass = 0;
 			vkCreateGraphicsPipelines(vk->device, nullptr, 1, &graphicsPipelineCreateInfo, nullptr, &vk->swapChainPipeline);
 
-			vertexShaderCode = readFile("imgui.vert.spv");
-			fragmentShaderCode = readFile("imgui.frag.spv");
+			vertexShaderCode = readFile("imgui_vert.spv");
+			fragmentShaderCode = readFile("imgui_frag.spv");
 			shaderModuleCreateInfo.codeSize = vertexShaderCode.size();
 			shaderModuleCreateInfo.pCode = (uint32*)vertexShaderCode.data();
 			vkCreateShaderModule(vk->device, &shaderModuleCreateInfo, nullptr, &vertFragStages[0].shaderModule);
@@ -961,7 +962,7 @@ struct Vulkan {
 			vkCreateGraphicsPipelines(vk->device, nullptr, 1, &graphicsPipelineCreateInfo, nullptr, &vk->imguiPipeline);
 		}
 		{
-			vk->rayTracingDescriptorSet0TextureCount = 1024;
+			vk->pathTraceDescriptorSet0TextureCount = 1024;
 			VkDescriptorSetLayoutBinding descriptorSetBindings[] = {
 				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR },
 				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR },
@@ -973,7 +974,7 @@ struct Vulkan {
 				{.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
 				{.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
 				{.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
-				{.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = vk->rayTracingDescriptorSet0TextureCount, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
+				{.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = vk->pathTraceDescriptorSet0TextureCount, .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR },
 			};
 			for (uint32 i = 0; i < countof(descriptorSetBindings); i++) {
 				descriptorSetBindings[i].binding = (uint32)i;
@@ -987,29 +988,30 @@ struct Vulkan {
 				.bindingCount = countof(descriptorSetBindings),
 				.pBindings = descriptorSetBindings,
 			};
-			vkCreateDescriptorSetLayout(vk->device, &descriptorSetLayoutCreateInfo, nullptr, &vk->rayTracingDescriptorSet0Layout);
+			vkCreateDescriptorSetLayout(vk->device, &descriptorSetLayoutCreateInfo, nullptr, &vk->pathTraceDescriptorSet0Layout);
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
 				.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 				.setLayoutCount = 1,
-				.pSetLayouts = &vk->rayTracingDescriptorSet0Layout,
+				.pSetLayouts = &vk->pathTraceDescriptorSet0Layout,
 			};
-			vkCreatePipelineLayout(vk->device, &pipelineLayoutCreateInfo, nullptr, &vk->rayTracingPipelineLayout);
+			vkCreatePipelineLayout(vk->device, &pipelineLayoutCreateInfo, nullptr, &vk->pathTracePipelineLayout);
 
+			VkShaderModuleCreateInfo shaderModuleCreateInfo = {
+				.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+			};
 			VkPipelineShaderStageCreateInfo shaderStageCreateInfos[] = {
 				{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR, .pName = "main" },
 				{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_MISS_BIT_KHR, .pName = "main" },
 				{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, .pName = "main" }
 			};
+			std::vector<char> rayGenShaderCode = readFile("pathTrace_rgen.spv");
+			std::vector<char> rayMissShaderCode = readFile("pathTrace_rmiss.spv");
+			std::vector<char> rayChitShaderCode = readFile("pathTrace_primary_rchit.spv");
+			//std::vector<char> rayChitShaderCode = readFile("pathTrace_rchit.spv");
 
-			std::vector<char> rayGenShaderCode = readFile("rayTrace.rgen.spv");
-			std::vector<char> rayMissShaderCode = readFile("rayTrace.rmiss.spv");
-			std::vector<char> rayChitShaderCode = readFile("rayTrace.rchit.spv");
-			VkShaderModuleCreateInfo shaderModuleCreateInfo = {
-				.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-				.codeSize = rayGenShaderCode.size(),
-				.pCode = (uint32*)rayGenShaderCode.data(),
-			};
+			shaderModuleCreateInfo.codeSize = rayGenShaderCode.size();
+			shaderModuleCreateInfo.pCode = (uint32*)rayGenShaderCode.data();
 			vkCreateShaderModule(vk->device, &shaderModuleCreateInfo, nullptr, &shaderStageCreateInfos[0].shaderModule);
 			shaderModuleCreateInfo.codeSize = rayMissShaderCode.size();
 			shaderModuleCreateInfo.pCode = (uint32*)rayMissShaderCode.data();
@@ -1051,16 +1053,17 @@ struct Vulkan {
 				.pStages = shaderStageCreateInfos,
 				.groupCount = countof(shaderGroups),
 				.pGroups = shaderGroups,
-				.layout = vk->rayTracingPipelineLayout
+				.maxPipelineRayRecursionDepth = 3,
+				.layout = vk->pathTracePipelineLayout
 			};
-			vkCreateRayTracingPipelines(vk->device, nullptr, nullptr, 1, &pipelineCreateInfo, nullptr, &vk->rayTracingPipeline);
+			vkCreateRayTracingPipelines(vk->device, nullptr, nullptr, 1, &pipelineCreateInfo, nullptr, &vk->pathTracePipeline);
 
-			std::vector<char> shaderGroupHandles(vk->rayTracingProperties.shaderGroupHandleSize* countof(shaderGroups));
-			vkGetRayTracingShaderGroupHandles(vk->device, vk->rayTracingPipeline, 0, countof(shaderGroups), shaderGroupHandles.size(), shaderGroupHandles.data());
+			std::vector<char> shaderGroupHandles(vk->pathTracePipelineProps.shaderGroupHandleSize* countof(shaderGroups));
+			vkGetRayTracingShaderGroupHandles(vk->device, vk->pathTracePipeline, 0, countof(shaderGroups), shaderGroupHandles.size(), shaderGroupHandles.data());
 
-			uint64 alignedGroupSize = align(vk->rayTracingProperties.shaderGroupHandleSize, vk->rayTracingProperties.shaderGroupBaseAlignment);
+			uint64 alignedGroupSize = align(vk->pathTracePipelineProps.shaderGroupHandleSize, vk->pathTracePipelineProps.shaderGroupBaseAlignment);
 			uint64 sbtBufferSize = alignedGroupSize * countof(shaderGroups);
-			vk->rayTracingSBTBuffer = vk->createBuffer(&vk->gpuBuffersMemory, sbtBufferSize,
+			vk->pathTraceSBTBuffer = vk->createBuffer(&vk->gpuBuffersMemory, sbtBufferSize,
 				VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
 			).first;
 
@@ -1069,8 +1072,8 @@ struct Vulkan {
 			for (size_t i = 0; i < countof(shaderGroups); i++) {
 				memcpy(
 					stagingBufferMappedMemory + i * alignedGroupSize,
-					shaderGroupHandles.data() + i * vk->rayTracingProperties.shaderGroupHandleSize,
-					vk->rayTracingProperties.shaderGroupHandleSize
+					shaderGroupHandles.data() + i * vk->pathTracePipelineProps.shaderGroupHandleSize,
+					vk->pathTracePipelineProps.shaderGroupHandleSize
 				);
 			}
 			vkUnmapMemory(vk->device, vk->stagingBuffersMemory.memory);
@@ -1084,7 +1087,7 @@ struct Vulkan {
 			VkBufferCopy bufferCopy = {
 				.srcOffset = 0, .dstOffset = 0, .size = sbtBufferSize
 			};
-			vkCmdCopyBuffer(cmdBuf, vk->stagingBuffer, vk->rayTracingSBTBuffer, 1, &bufferCopy);
+			vkCmdCopyBuffer(cmdBuf, vk->stagingBuffer, vk->pathTraceSBTBuffer, 1, &bufferCopy);
 			vkEndCommandBuffer(cmdBuf);
 			VkSubmitInfo submitInfo = {
 				.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = 1, .pCommandBuffers = &cmdBuf
@@ -1093,12 +1096,13 @@ struct Vulkan {
 			vkQueueWaitIdle(vk->graphicsQueue);
 
 			VkBufferDeviceAddressInfo bufferDeviceAddressInfo = {
-				.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = vk->rayTracingSBTBuffer
+				.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = vk->pathTraceSBTBuffer
 			};
 			VkDeviceAddress sbtBasedAddress = vkGetBufferDeviceAddress(vk->device, &bufferDeviceAddressInfo);
-			vk->rayTracingSBTBufferRayGenDeviceAddress = { sbtBasedAddress, 0, 0 };
-			vk->rayTracingSBTBufferMissDeviceAddress = { sbtBasedAddress + alignedGroupSize, 0, 0 };
-			vk->rayTracingSBTBufferHitGroupDeviceAddress = { sbtBasedAddress + alignedGroupSize * 2, 0, 0 };
+			vk->pathTraceSBTBufferRayGenDeviceAddress = { sbtBasedAddress, 0, 0 };
+			vk->pathTraceSBTBufferMissDeviceAddress = { sbtBasedAddress + alignedGroupSize, 0, 0 };
+			vk->pathTraceSBTBufferHitGroupDeviceAddress = { sbtBasedAddress + alignedGroupSize * 2, 0, 0 };
+			vk->pathTraceSBTBufferCallableDeviceAddress = { 0, 0, 0 };
 		}
 
 		return vk;
@@ -1525,7 +1529,8 @@ struct Scene {
 					comp == 1 ? VK_FORMAT_R8_UNORM :
 					comp == 2 ? VK_FORMAT_R8G8_UNORM :
 					comp == 3 ? VK_FORMAT_R8G8B8A8_SRGB :
-					comp == 4 ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_UNDEFINED;
+					comp == 4 ? VK_FORMAT_R8G8B8A8_SRGB :
+					VK_FORMAT_UNDEFINED;
 				assert(format != VK_FORMAT_UNDEFINED);
 				if (comp == 3) {
 					comp = 4;
@@ -2060,7 +2065,7 @@ struct Scene {
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 				.descriptorPool = vkFrame.descriptorPool,
 				.descriptorSetCount = 1,
-				.pSetLayouts = &vk->rayTracingDescriptorSet0Layout
+				.pSetLayouts = &vk->pathTraceDescriptorSet0Layout
 			};
 			VkDescriptorSet descriptorSet;
 			vkAllocateDescriptorSets(vk->device, &descriptorSetAllocateInfo, &descriptorSet);
@@ -2084,7 +2089,7 @@ struct Scene {
 			VkDescriptorBufferInfo instancesBufferInfo = { .buffer = instancesBuffer, .range = VK_WHOLE_SIZE };
 			VkDescriptorBufferInfo constantsBufferInfo = { .buffer = vkFrame.rayTracingConstantBuffer, .range = VK_WHOLE_SIZE };
 			VkDescriptorImageInfo textureSamplerInfo = { .sampler = vk->trilinearSampler };
-			std::vector<VkDescriptorImageInfo> textureImageInfos(vk->rayTracingDescriptorSet0TextureCount);
+			std::vector<VkDescriptorImageInfo> textureImageInfos(vk->pathTraceDescriptorSet0TextureCount);
 			for (size_t i = 0; i < textureImageInfos.size(); i++) {
 				auto& info = textureImageInfos[i];
 				if (i < textures.size()) {
@@ -2122,8 +2127,8 @@ struct Scene {
 			}
 			vkUpdateDescriptorSets(vk->device, countof(descriptorSetWrites), descriptorSetWrites, 0, nullptr);
 
-			vkCmdBindPipeline(vkFrame.graphicsCmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipeline);
-			vkCmdBindDescriptorSets(vkFrame.graphicsCmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->rayTracingPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			vkCmdBindPipeline(vkFrame.graphicsCmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->pathTracePipeline);
+			vkCmdBindDescriptorSets(vkFrame.graphicsCmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk->pathTracePipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 			VkImageMemoryBarrier imageMemoryBarriers[] = {
 				{
@@ -2144,10 +2149,10 @@ struct Scene {
 			);
 
 			vkCmdTraceRays(vkFrame.graphicsCmdBuf,
-				&vk->rayTracingSBTBufferRayGenDeviceAddress,
-				&vk->rayTracingSBTBufferMissDeviceAddress,
-				&vk->rayTracingSBTBufferHitGroupDeviceAddress,
-				&vk->rayTracingSBTBufferHitGroupDeviceAddress,
+				&vk->pathTraceSBTBufferRayGenDeviceAddress,
+				&vk->pathTraceSBTBufferMissDeviceAddress,
+				&vk->pathTraceSBTBufferHitGroupDeviceAddress,
+				&vk->pathTraceSBTBufferCallableDeviceAddress,
 				windowWidth, windowHeight, 1
 			);
 
@@ -2260,7 +2265,7 @@ int main(int argc, char** argv) {
 		//ImGui::GetIO().DeltaTime = 1.0f / 60.0f;
 		ImGui::GetIO().DisplaySize = { (float)windowWidth, (float)windowHeight };
 		ImGui::NewFrame();
-		
+
 		if (ImGui::IsKeyPressed(SDL_SCANCODE_F11)) {
 			windowFullscreenState = windowFullscreenState ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
 			int err = SDL_SetWindowFullscreen(window, windowFullscreenState);

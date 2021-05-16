@@ -35,7 +35,7 @@
     <None Include="..\src\shaders\imgui.slang">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="..\src\shaders\rayTrace.slang">
+    <None Include="..\src\shaders\pathTrace.slang">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>
