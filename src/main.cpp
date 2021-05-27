@@ -180,6 +180,7 @@ struct Vulkan {
 		VkFence queueFence;
 		VkDescriptorPool descriptorPool;
 		Memory uniformBuffersMemory;
+		uint8* uniformBuffersMappedPtr;
 		VkBuffer rayTracingConstantBuffer;
 		uint64 rayTracingConstantBufferMemoryOffset;
 		uint64 rayTracingConstantBufferMemorySize;
@@ -669,6 +670,8 @@ struct Vulkan {
 				vkAllocateMemory(vk->device, &memoryAllocateInfo, nullptr, &frame.uniformBuffersMemory.memory);
 				frame.uniformBuffersMemory.capacity = memoryAllocateInfo.allocationSize;
 				frame.uniformBuffersMemory.offset = 0;
+
+				vkMapMemory(vk->device, frame.uniformBuffersMemory.memory, 0, VK_WHOLE_SIZE, 0, (void**)&frame.uniformBuffersMappedPtr);
 
 				frame.rayTracingConstantBufferMemorySize = 1_kb;
 				std::tie(frame.rayTracingConstantBuffer, frame.rayTracingConstantBufferMemoryOffset) =
@@ -2047,7 +2050,7 @@ struct Scene {
 		}
 	}
 
-	void drawCommands(Vulkan* vk, uint8* uniformBufferPtr, uint windowWidth, uint windowHeight) {
+	void drawCommands(Vulkan* vk, uint windowWidth, uint windowHeight) {
 		auto& vkFrame = vk->frames[vk->frameIndex];
 		{
 			struct {
@@ -2059,7 +2062,7 @@ struct Scene {
 				camera.position,
 				vk->accumulatedFrameCount
 			};
-			memcpy(uniformBufferPtr + vkFrame.rayTracingConstantBufferMemoryOffset, &constantsBuffer, sizeof(constantsBuffer));
+			memcpy(vkFrame.uniformBuffersMappedPtr + vkFrame.rayTracingConstantBufferMemoryOffset, &constantsBuffer, sizeof(constantsBuffer));
 
 			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -2287,9 +2290,6 @@ int main(int argc, char** argv) {
 		vkResetFences(vk->device, 1, &vkFrame.queueFence);
 		vkResetDescriptorPool(vk->device, vkFrame.descriptorPool, 0);
 
-		uint8* uniformBuffersMappedMemoryPtr;
-		vkMapMemory(vk->device, vkFrame.uniformBuffersMemory.memory, 0, VK_WHOLE_SIZE, 0, (void**)&uniformBuffersMappedMemoryPtr);
-
 		VkCommandBufferBeginInfo cmdBufBeginInfo = {
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
@@ -2297,7 +2297,7 @@ int main(int argc, char** argv) {
 		vkResetCommandBuffer(vkFrame.graphicsCmdBuf, 0);
 		vkBeginCommandBuffer(vkFrame.graphicsCmdBuf, &cmdBufBeginInfo);
 
-		scene->drawCommands(vk, uniformBuffersMappedMemoryPtr, windowWidth, windowHeight);
+		scene->drawCommands(vk, windowWidth, windowHeight);
 
 		VkClearValue clearValue = {
 			.color = {0, 0, 0, 0}
@@ -2410,8 +2410,8 @@ int main(int argc, char** argv) {
 				const ImDrawList& dlist = *drawData->CmdLists[cmdListIndex];
 				uint64 verticesSize = dlist.VtxBuffer.Size * sizeof(ImDrawVert);
 				uint64 indicesSize = dlist.IdxBuffer.Size * sizeof(ImDrawIdx);
-				memcpy(uniformBuffersMappedMemoryPtr + vkFrame.imguiVertBufferMemoryOffset + vertBufferOffset, dlist.VtxBuffer.Data, verticesSize);
-				memcpy(uniformBuffersMappedMemoryPtr + vkFrame.imguiIndexBufferMemoryOffset + indexBufferOffset, dlist.IdxBuffer.Data, indicesSize);
+				memcpy(vkFrame.uniformBuffersMappedPtr + vkFrame.imguiVertBufferMemoryOffset + vertBufferOffset, dlist.VtxBuffer.Data, verticesSize);
+				memcpy(vkFrame.uniformBuffersMappedPtr + vkFrame.imguiIndexBufferMemoryOffset + indexBufferOffset, dlist.IdxBuffer.Data, indicesSize);
 				uint64 vertIndex = vertBufferOffset / sizeof(ImDrawVert);
 				uint64 indexIndex = indexBufferOffset / sizeof(ImDrawIdx);
 				for (int i = 0; i < dlist.CmdBuffer.Size; i++) {
@@ -2436,7 +2436,6 @@ int main(int argc, char** argv) {
 		}
 		vkCmdEndRenderPass(vkFrame.graphicsCmdBuf);
 		vkEndCommandBuffer(vkFrame.graphicsCmdBuf);
-		vkUnmapMemory(vk->device, vkFrame.uniformBuffersMemory.memory);
 
 		VkPipelineStageFlags pipelineStageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		VkSubmitInfo submitInfo = {
