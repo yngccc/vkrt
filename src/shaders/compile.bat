@@ -4,7 +4,7 @@ set outDir=%1
 if "%outDir%" == "" set outDir=%cd%
 
 set flags=--target-env vulkan1.2 -g
-set slang=..\..\thirdParty\bin\slang\slangc.exe
+set slang=..\..\thirdParty\slang\slangc.exe
 
 pushd %~dp0
 
